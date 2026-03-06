@@ -1,7 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import supabase from './db/supabaseClient';
 import type { QuestionInstanceState, RaceSnapshot } from './types';
 import {
   createLobby,
@@ -42,8 +44,36 @@ app.use(cors());
 app.use(express.json());
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  try {
+    // Test Supabase connection by querying a simple table
+    const { data, error } = await supabase.from('lobbies').select('id').limit(1);
+
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      supabase: error ? 'error' : 'connected',
+      supabaseError: error?.message || null,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      supabase: 'error',
+      error: (err as Error).message,
+    });
+  }
+});
+
+// Supabase connectivity test
+app.get('/health/supabase', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('lobbies').select('id').limit(1);
+    if (error) throw error;
+    res.json({ status: 'connected', timestamp: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ status: 'error', error: (err as Error).message });
+  }
 });
 
 // OpenF1 client and snapshot store

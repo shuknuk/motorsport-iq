@@ -30,7 +30,7 @@ Backend:    Node.js + Express + Socket.io (WebSockets)
 Database:   Supabase (PostgreSQL)
 Hosting:    Vercel (frontend) + Render (backend)
 Data:       OpenF1 API — https://api.openf1.org/v1
-AI:         Claude API — model: claude-sonnet-4-20250514
+AI:         Groq API — model: llama-3.3-70b-versatile
 ```
 
 ---
@@ -45,7 +45,7 @@ Spawn subagents for:
 - **lobby-agent** → lobbyManager, lifecycleManager, Socket.io events
 - **ui-agent** → all Next.js screens and components (use frontend-design skill)
 - **db-agent** → Supabase schema, migrations, queries
-- **ai-agent** → Claude API explanation generator (use product-self-knowledge skill)
+- **ai-agent** → Groq API explanation generator (use product-self-knowledge skill)
 
 Each subagent receives: its module scope, the relevant schema/interfaces, and the Socket.io event contract. Each returns only its finished, tested module. The main agent assembles them.
 
@@ -457,14 +457,14 @@ accuracy = correct_answers / total_answered * 100;
 
 ---
 
-## AI EXPLANATION (Claude API)
+## AI EXPLANATION (Groq API)
 
 > Before implementing this, read `/mnt/skills/public/product-self-knowledge/SKILL.md`
 
 ```typescript
-import Anthropic from "@anthropic-ai/sdk";
+import Groq from "groq-sdk";
 
-const client = new Anthropic(); // key from ANTHROPIC_API_KEY env var
+const client = new Groq(); // key from GROQ_API_KEY env var
 
 async function generateExplanation(
   question: QuestionInstance,
@@ -589,7 +589,7 @@ Mention tyres, DRS, or strategy if relevant. No jargon.`,
 # Backend
 SUPABASE_URL=
 SUPABASE_SERVICE_KEY=
-ANTHROPIC_API_KEY=
+GROQ_API_KEY=
 OPENF1_BASE_URL=https://api.openf1.org/v1
 PORT=4000
 CORS_ORIGIN=http://localhost:3000
@@ -654,7 +654,7 @@ Write tests for: resolution logic, scoring engine, derived signals, cancellation
 8. Scoring engine (points + streaks + accuracy)
 9. Lobby manager + Socket.io events
 10. Lifecycle manager (FSM + timers + cooldowns)
-11. Claude API explanation generator
+11. Groq API explanation generator
 12. Frontend: Home + Lobby screens
 13. Frontend: Live Question Card + Countdown Timer
 14. Frontend: Leaderboard

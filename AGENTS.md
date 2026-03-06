@@ -6,7 +6,7 @@ Real-time Formula 1 prediction companion web app. Users join private lobbies, re
 ## 💻 Tech Stack
 - **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Socket.io-client.
 - **Backend**: Node.js/Express, Socket.io, Supabase (PostgreSQL).
-- **AI**: Anthropic Claude API (Explanations).
+- **AI**: Groq API (Explanations using Llama 3.3).
 - **Data**: OpenF1 API (Real-time race telemetry).
 
 ## 🏎️ Specialized Logic (Antigravity Skill)
@@ -32,7 +32,7 @@ motorsport-iq/
 
 ## ⚙️ Environment Variables
 Refer to `.env.example` in `backend/` and `frontend/` for:
-- `SUPABASE_URL`, `ANTHROPIC_API_KEY`, `OPENF1_BASE_URL`, `NEXT_PUBLIC_SOCKET_URL`.
+- `SUPABASE_URL`, `GROQ_API_KEY`, `OPENF1_BASE_URL`, `NEXT_PUBLIC_SOCKET_URL`.
 
 ## 🚀 Common Commands
 ```bash

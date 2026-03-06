@@ -1,19 +1,19 @@
 // @ts-nocheck - Complex type issues with optional chaining
 // @ts-nocheck - Complex type inference issues
-import Anthropic from '@anthropic-ai/sdk';
+import Groq from 'groq-sdk';
 import type { RaceSnapshot, DriverState, QuestionInstanceState } from '../types';
 import { getQuestionById } from '../engine/questionBank';
 import { getDriverByNumber } from '../engine/derivedSignals';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
-const MODEL = 'claude-sonnet-4-20250514';
+const MODEL = 'llama-3.3-70b-versatile';
 const MAX_TOKENS = 200;
 
 /**
- * Generate an explanation for a question outcome using Claude
+ * Generate an explanation for a question outcome using Groq
  */
 export async function generateExplanation(
   instance: QuestionInstanceState,
@@ -32,11 +32,11 @@ export async function generateExplanation(
     return generateBasicExplanation(instance, outcome);
   }
 
-  // Build context for Claude
+  // Build context for Groq
   const context = buildContext(instance, currentSnapshot, outcome);
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
       messages: [
@@ -63,9 +63,9 @@ Provide a concise, insightful explanation for ${driver1.name}'s fans. Be engagin
       ],
     });
 
-    const explanation = response.content[0];
-    if (explanation.type === 'text') {
-      return explanation.text.trim();
+    const explanation = response.choices[0]?.message?.content;
+    if (explanation) {
+      return explanation.trim();
     }
 
     return generateBasicExplanation(instance, outcome);
@@ -197,7 +197,7 @@ export async function generatePreRaceInsight(
   snapshot: RaceSnapshot
 ): Promise<string> {
   try {
-    const response = await anthropic.messages.create({
+    const response = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
       messages: [
@@ -214,9 +214,9 @@ Be encouraging and insightful. No markdown.`,
       ],
     });
 
-    const insight = response.content[0];
-    if (insight.type === 'text') {
-      return insight.text.trim();
+    const insight = response.choices[0]?.message?.content;
+    if (insight) {
+      return insight.trim();
     }
 
     return `${driver.name} starts P${driver.position} for ${driver.team}.`;
@@ -234,7 +234,7 @@ export async function generatePostRaceSummary(
   snapshot: RaceSnapshot
 ): Promise<string> {
   try {
-    const response = await anthropic.messages.create({
+    const response = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 300,
       messages: [
@@ -252,9 +252,9 @@ Be engaging and highlight the key moments. No markdown.`,
       ],
     });
 
-    const summary = response.content[0];
-    if (summary.type === 'text') {
-      return summary.text.trim();
+    const summary = response.choices[0]?.message?.content;
+    if (summary) {
+      return summary.trim();
     }
 
     return `Great race with ${topThree[0]?.name} taking the win!`;
