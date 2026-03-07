@@ -166,8 +166,8 @@ class SocketClient {
     this.socket?.emit(CLIENT_EVENTS.RECONNECT_LOBBY, { userId });
   }
 
-  getSessions(): void {
-    this.socket?.emit(CLIENT_EVENTS.GET_SESSIONS);
+  getSessions(year?: number): void {
+    this.socket?.emit(CLIENT_EVENTS.GET_SESSIONS, { year });
   }
 
   leaveLobby(): void {

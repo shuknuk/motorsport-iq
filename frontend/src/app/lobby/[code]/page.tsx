@@ -14,6 +14,7 @@ export default function LobbyPage() {
   const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export default function LobbyPage() {
     ];
 
     // Request sessions list
-    socket.getSessions();
+    socket.getSessions(selectedYear);
 
     // Try to reconnect
     const userId = localStorage.getItem('msp_user_id');
@@ -92,7 +93,7 @@ export default function LobbyPage() {
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [lobbyCode, router, selectedSession]);
+  }, [lobbyCode, router, selectedSession, selectedYear]);
 
   const handleCopyCode = useCallback(() => {
     navigator.clipboard.writeText(lobbyCode);
@@ -203,6 +204,26 @@ export default function LobbyPage() {
         {isHost && (
           <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 mb-6">
             <h2 className="text-lg font-semibold text-white mb-4">Select Session</h2>
+
+            {/* Year Selector */}
+            <div className="mb-4">
+              <label className="block text-sm text-gray-400 mb-2">Year</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => {
+                  setSelectedYear(Number(e.target.value));
+                  setSelectedSession('');
+                }}
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value={2026}>2026</option>
+                <option value={2025}>2025</option>
+                <option value={2024}>2024</option>
+                <option value={2023}>2023</option>
+              </select>
+            </div>
+
+            {/* Session Selector */}
             <select
               value={selectedSession}
               onChange={(e) => setSelectedSession(e.target.value)}

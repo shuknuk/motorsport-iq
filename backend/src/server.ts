@@ -449,9 +449,10 @@ io.on('connection', (socket) => {
   /**
    * Get available sessions
    */
-  socket.on('get_sessions', async () => {
+  socket.on('get_sessions', async (data: { year?: number }) => {
     try {
-      const sessions = await openF1Client.getSessions();
+      const year = data?.year || new Date().getFullYear();
+      const sessions = await openF1Client.getSessions(year);
       socket.emit('sessions_list', sessions);
     } catch (error) {
       socket.emit('error', { message: 'Failed to fetch sessions' });
