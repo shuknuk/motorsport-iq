@@ -86,12 +86,12 @@ export default function Home() {
   return (
     <main className="app-shell swiss-noise relative">
       <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 gap-6 px-4 py-6 md:px-8 lg:grid-cols-12 lg:gap-8 lg:py-10">
-        <section className="swiss-grid-pattern border-2 border-[var(--color-border)] bg-[var(--color-muted)] px-5 py-8 md:px-8 md:py-10 lg:col-span-7 lg:px-10 lg:py-12">
+        <section className="swiss-grid-pattern overflow-hidden border-2 border-[var(--color-border)] bg-[var(--color-muted)] px-5 py-8 md:px-8 md:py-10 lg:col-span-7 lg:px-10 lg:py-12">
           <div className="mb-8 flex items-start justify-between gap-4">
             <SectionLabel index="01" label="Race Interface" />
             <ThemeToggle />
           </div>
-          <h1 className="font-display text-6xl uppercase leading-[0.9] tracking-tight text-[var(--color-fg)] md:text-8xl lg:text-[9rem]">
+          <h1 className="font-display text-[clamp(2.6rem,7.2vw,5.25rem)] uppercase leading-[0.9] tracking-tight text-[var(--color-fg)]">
             Motorsport
             <span className="ml-2 text-[var(--color-accent)]">IQ</span>
           </h1>
@@ -107,7 +107,7 @@ export default function Home() {
             ].map((item) => (
               <Card key={item.label} className="p-4" tone="default">
                 <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">{item.label}</p>
-                <p className="mt-2 font-display text-3xl uppercase leading-none md:text-4xl">{item.value}</p>
+                <p className="mt-2 break-words font-display text-3xl uppercase leading-none md:text-[2.2rem]">{item.value}</p>
               </Card>
             ))}
           </div>
