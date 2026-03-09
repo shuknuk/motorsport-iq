@@ -1,6 +1,8 @@
 'use client';
 
+import { Card } from '@/components/ui';
 import type { LeaderboardEntry } from '@/lib/types';
+import { cn } from '@/lib/cn';
 
 interface LeaderboardProps {
   entries: LeaderboardEntry[];
@@ -21,116 +23,66 @@ export default function Leaderboard({
     })
     .slice(0, maxEntries);
 
-  const getRankStyle = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return 'bg-yellow-500/20 border-yellow-500';
-      case 2:
-        return 'bg-gray-400/20 border-gray-400';
-      case 3:
-        return 'bg-amber-600/20 border-amber-600';
-      default:
-        return 'bg-gray-800/50 border-gray-700';
-    }
-  };
-
-  const getRankBadge = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return '🥇';
-      case 2:
-        return '🥈';
-      case 3:
-        return '🥉';
-      default:
-        return `#${rank}`;
-    }
-  };
-
-  if (entries.length === 0) {
-    return (
-      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-        <h3 className="text-lg font-bold text-white mb-4">Leaderboard</h3>
-        <p className="text-gray-400 text-center py-4">No players yet</p>
-      </div>
-    );
-  }
+  const me = currentUserId ? entries.find((entry) => entry.userId === currentUserId) : undefined;
 
   return (
-    <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-      <h3 className="text-lg font-bold text-white mb-4">Leaderboard</h3>
-      <div className="space-y-2">
-        {sortedEntries.map((entry, index) => {
-          const rank = index + 1;
-          const isCurrentUser = entry.userId === currentUserId;
+    <Card tone="default" className="h-full p-5 md:p-6">
+      <h3 className="font-display text-2xl uppercase tracking-tight">Leaderboard</h3>
 
-          return (
-            <div
-              key={entry.userId}
-              className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                getRankStyle(rank)
-              } ${isCurrentUser ? 'ring-2 ring-blue-500' : ''}`}
-            >
-              {/* Rank */}
-              <div className="w-8 text-center font-bold">
-                {typeof getRankBadge(rank) === 'string' && getRankBadge(rank).startsWith('#') ? (
-                  <span className="text-gray-400">{getRankBadge(rank)}</span>
-                ) : (
-                  <span className="text-xl">{getRankBadge(rank)}</span>
+      {sortedEntries.length === 0 ? (
+        <p className="mt-5 border-2 border-[var(--color-border)] p-4 text-center font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+          No Players Yet
+        </p>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {sortedEntries.map((entry, index) => {
+            const rank = index + 1;
+            const isCurrentUser = entry.userId === currentUserId;
+
+            return (
+              <div
+                key={entry.userId}
+                className={cn(
+                  'grid grid-cols-[40px_1fr_auto] items-center gap-3 border-2 border-[var(--color-border)] p-3',
+                  isCurrentUser && 'border-[var(--color-accent)]'
                 )}
-              </div>
-
-              {/* Username */}
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-white truncate">
-                  {entry.username}
-                  {isCurrentUser && (
-                    <span className="ml-2 text-xs text-blue-400">(You)</span>
-                  )}
+              >
+                <p className="font-display text-sm uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">#{rank}</p>
+                <div className="min-w-0">
+                  <p className="truncate font-display text-lg uppercase leading-none">{entry.username}</p>
+                  <p className="font-body text-xs text-[var(--color-muted-fg)]">
+                    {entry.accuracy.toFixed(0)}% accuracy {entry.streak > 0 ? `· streak ${entry.streak}` : ''}
+                  </p>
                 </div>
-                <div className="text-xs text-gray-400 flex items-center gap-2">
-                  <span>{entry.accuracy.toFixed(0)}% accuracy</span>
-                  {entry.streak > 0 && (
-                    <span className="text-orange-400">🔥 {entry.streak}</span>
-                  )}
+                <div className="text-right">
+                  <p className="font-display text-2xl leading-none">{entry.points}</p>
+                  <p className="font-display text-[10px] uppercase tracking-[0.16em] text-[var(--color-muted-fg)]">pts</p>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              {/* Points */}
-              <div className="text-right">
-                <div className="font-bold text-white text-lg">{entry.points}</div>
-                <div className="text-xs text-gray-400">pts</div>
-              </div>
+      {me && (
+        <div className="mt-5 border-t-2 border-[var(--color-border)] pt-4">
+          <p className="mb-3 font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Your Summary</p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="border-2 border-[var(--color-border)] p-2 text-center">
+              <p className="font-display text-2xl leading-none">{me.correctAnswers}</p>
+              <p className="font-display text-[10px] uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">Correct</p>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Stats summary */}
-      {currentUserId && entries.find((e) => e.userId === currentUserId) && (
-        <div className="mt-4 pt-4 border-t border-gray-700">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div>
-              <div className="text-xl font-bold text-white">
-                {entries.find((e) => e.userId === currentUserId)?.correctAnswers ?? 0}
-              </div>
-              <div className="text-xs text-gray-400">Correct</div>
+            <div className="border-2 border-[var(--color-border)] p-2 text-center">
+              <p className="font-display text-2xl leading-none">{me.maxStreak}</p>
+              <p className="font-display text-[10px] uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">Best Streak</p>
             </div>
-            <div>
-              <div className="text-xl font-bold text-white">
-                {entries.find((e) => e.userId === currentUserId)?.maxStreak ?? 0}
-              </div>
-              <div className="text-xs text-gray-400">Best Streak</div>
-            </div>
-            <div>
-              <div className="text-xl font-bold text-white">
-                {(entries.find((e) => e.userId === currentUserId)?.accuracy ?? 0).toFixed(0)}%
-              </div>
-              <div className="text-xs text-gray-400">Accuracy</div>
+            <div className="border-2 border-[var(--color-border)] p-2 text-center">
+              <p className="font-display text-2xl leading-none">{me.accuracy.toFixed(0)}%</p>
+              <p className="font-display text-[10px] uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">Accuracy</p>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

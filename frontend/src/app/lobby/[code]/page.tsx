@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSocketClient } from '@/lib/socket';
-import type { LobbyState, SessionInfo, PlayerState } from '@/lib/types';
-import { SERVER_EVENTS } from '@/lib/types';
+import { SERVER_EVENTS, type LobbyState, type SessionInfo } from '@/lib/types';
+import { Button, Card, SectionLabel, ThemeToggle } from '@/components/ui';
 
 export default function LobbyPage() {
   const params = useParams();
@@ -13,7 +13,7 @@ export default function LobbyPage() {
 
   const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [selectedSession, setSelectedSession] = useState<string>('');
+  const [selectedSession, setSelectedSession] = useState('');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
@@ -22,7 +22,6 @@ export default function LobbyPage() {
 
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
 
-  // Set up socket listeners
   useEffect(() => {
     const socket = getSocketClient();
     socket.connect();
@@ -32,7 +31,6 @@ export default function LobbyPage() {
         setLobbyState(state);
         setIsLoading(false);
 
-        // If game is active, redirect to game page
         if (state.status === 'active') {
           router.push(`/game/${state.code}`);
         }
@@ -51,7 +49,7 @@ export default function LobbyPage() {
           if (!prev) return prev;
           return {
             ...prev,
-            players: prev.players.filter((p) => p.id !== data.userId),
+            players: prev.players.filter((player) => player.id !== data.userId),
           };
         });
       }),
@@ -60,8 +58,8 @@ export default function LobbyPage() {
           if (!prev) return prev;
           return {
             ...prev,
-            players: prev.players.map((p) =>
-              p.id === data.userId ? { ...p, connected: false } : p
+            players: prev.players.map((player) =>
+              player.id === data.userId ? { ...player, connected: false } : player
             ),
           };
         });
@@ -81,17 +79,15 @@ export default function LobbyPage() {
       }),
     ];
 
-    // Request sessions list
     socket.getSessions(selectedYear);
 
-    // Try to reconnect
     const userId = localStorage.getItem('msp_user_id');
     if (userId) {
       socket.reconnectLobby(userId);
     }
 
     return () => {
-      unsubscribers.forEach((unsub) => unsub());
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [lobbyCode, router, selectedSession, selectedYear]);
 
@@ -113,173 +109,163 @@ export default function LobbyPage() {
     }
 
     setIsStarting(true);
-    const socket = getSocketClient();
-    socket.startSession(lobbyState.id, selectedSession);
+    getSocketClient().startSession(lobbyState.id, selectedSession);
   }, [lobbyState, selectedSession]);
 
   const isHost = lobbyState?.hostId === currentUserId;
 
+  const years = useMemo(() => [2026, 2025, 2024, 2023], []);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
+      <main className="app-shell flex items-center justify-center">
+        <p className="font-display text-2xl uppercase tracking-[0.14em]">Loading Lobby…</p>
+      </main>
     );
   }
 
   if (!lobbyState) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-xl mb-4">Lobby not found</div>
-          <button
-            onClick={() => router.push('/')}
-            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
-          >
+      <main className="app-shell flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg text-center" tone="default">
+          <p className="font-display text-4xl uppercase">Lobby Not Found</p>
+          <Button onClick={() => router.push('/')} className="mt-6 w-full">
             Back to Home
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Card>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black p-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Lobby</h1>
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-gray-400">Code:</span>
-            <button
-              onClick={handleCopyCode}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg text-2xl font-mono text-white transition-all"
-            >
-              {lobbyCode}
-            </button>
-            <button
-              onClick={handleCopyCode}
-              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-all"
-            >
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
+    <main className="app-shell swiss-noise relative">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
+        <header className="mb-6 grid gap-4 border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-5 md:grid-cols-[1fr_auto] md:items-start md:p-6">
+          <div>
+            <SectionLabel index="03" label="Lobby Control" />
+            <h1 className="mt-2 font-display text-5xl uppercase tracking-tight md:text-7xl">{lobbyCode}</h1>
+            <p className="mt-2 font-body text-sm text-[var(--color-muted-fg)]">
+              Host controls race session. Players receive synchronized state updates on reconnect.
+            </p>
           </div>
-        </div>
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            <ThemeToggle />
+            <Button variant="secondary" onClick={handleCopyCode}>
+              {copied ? 'Code Copied' : 'Copy Code'}
+            </Button>
+            <Button variant="ghost" onClick={() => router.push('/')}>
+              Leave Lobby
+            </Button>
+          </div>
+        </header>
 
-        {/* Players */}
-        <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 mb-6">
-          <h2 className="text-lg font-semibold text-white mb-4">
-            Players ({lobbyState.players.length})
-          </h2>
-          <div className="space-y-2">
-            {lobbyState.players.map((player) => (
-              <div
-                key={player.id}
-                className={`flex items-center justify-between p-3 rounded-lg ${
-                  player.connected ? 'bg-gray-700/50' : 'bg-gray-800/50'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${player.connected ? 'bg-green-500' : 'bg-gray-500'}`} />
-                  <span className={player.connected ? 'text-white' : 'text-gray-400'}>
+        <section className="grid gap-6 lg:grid-cols-12">
+          <Card className="lg:col-span-5" tone="default">
+            <SectionLabel index="03A" label="Players" className="mb-4" />
+            <div className="space-y-2">
+              {lobbyState.players.map((player) => (
+                <div
+                  key={player.id}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-2 border-[var(--color-border)] p-3"
+                >
+                  <div
+                    className="h-3 w-3 border-2 border-[var(--color-border)]"
+                    style={{
+                      backgroundColor: player.connected ? 'var(--color-accent)' : 'transparent',
+                    }}
+                  />
+                  <p className="font-display text-lg uppercase">
                     {player.username}
-                  </span>
-                  {player.isHost && (
-                    <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">
-                      Host
-                    </span>
-                  )}
+                    {player.isHost ? ' · HOST' : ''}
+                    {player.id === currentUserId ? ' · YOU' : ''}
+                  </p>
+                  <p className="font-display text-xs uppercase tracking-[0.15em] text-[var(--color-muted-fg)]">
+                    {player.connected ? 'Online' : 'Offline'}
+                  </p>
                 </div>
-                {player.id === currentUserId && (
-                  <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">
-                    You
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Session Selection (Host Only) */}
-        {isHost && (
-          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 mb-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Select Session</h2>
-
-            {/* Year Selector */}
-            <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-2">Year</label>
-              <select
-                value={selectedYear}
-                onChange={(e) => {
-                  setSelectedYear(Number(e.target.value));
-                  setSelectedSession('');
-                }}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <option value={2026}>2026</option>
-                <option value={2025}>2025</option>
-                <option value={2024}>2024</option>
-                <option value={2023}>2023</option>
-              </select>
-            </div>
-
-            {/* Session Selector */}
-            <select
-              value={selectedSession}
-              onChange={(e) => setSelectedSession(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-            >
-              <option value="">Select a session...</option>
-              {sessions.map((session) => (
-                <option key={session.session_key} value={session.session_key}>
-                  {session.session_name} - {session.location} ({session.year})
-                </option>
               ))}
-            </select>
-            {sessions.length === 0 && (
-              <p className="text-gray-400 text-sm mt-2">
-                No active sessions. Waiting for live race...
+            </div>
+          </Card>
+
+          <Card className="swiss-grid-pattern lg:col-span-7" tone="muted">
+            {isHost ? (
+              <>
+                <SectionLabel index="03B" label="Session Setup" className="mb-4" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                      Season Year
+                    </span>
+                    <select
+                      value={selectedYear}
+                      onChange={(event) => {
+                        setSelectedYear(Number(event.target.value));
+                        setSelectedSession('');
+                      }}
+                      className="h-12 w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 font-display text-sm uppercase focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
+                    >
+                      {years.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                      Race Session
+                    </span>
+                    <select
+                      value={selectedSession}
+                      onChange={(event) => setSelectedSession(event.target.value)}
+                      className="h-12 w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 font-display text-sm uppercase focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
+                    >
+                      <option value="">Select Session...</option>
+                      {sessions.map((session) => (
+                        <option key={session.session_key} value={session.session_key}>
+                          {session.session_name} - {session.location} ({session.year})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {sessions.length === 0 && (
+                  <p className="mt-4 border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-3 font-display text-xs uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">
+                    No active sessions detected. Waiting for race feed.
+                  </p>
+                )}
+
+                <Button
+                  onClick={handleStartGame}
+                  disabled={isStarting || !selectedSession}
+                  size="lg"
+                  className="mt-6 w-full"
+                >
+                  {isStarting ? 'Starting Session...' : 'Start Race Session'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <SectionLabel index="03B" label="Standby" className="mb-4" />
+                <div className="swiss-dots border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-8 text-center">
+                  <p className="font-display text-3xl uppercase">Waiting for Host</p>
+                  <p className="mt-2 font-body text-sm text-[var(--color-muted-fg)]">
+                    Session configuration is controlled by the host.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {error && (
+              <p className="mt-4 border-2 border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_88%)] p-3 font-display text-xs uppercase tracking-[0.14em]">
+                {error}
               </p>
             )}
-          </div>
-        )}
-
-        {/* Waiting Message (Non-Host) */}
-        {!isHost && (
-          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 mb-6">
-            <div className="text-center text-gray-400">
-              <div className="animate-pulse mb-2">Waiting for host to start the game...</div>
-              <div className="text-sm">Share the lobby code with friends!</div>
-            </div>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm text-center">
-            {error}
-          </div>
-        )}
-
-        {/* Start Button */}
-        {isHost && (
-          <button
-            onClick={handleStartGame}
-            disabled={isStarting || !selectedSession}
-            className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all"
-          >
-            {isStarting ? 'Starting...' : 'Start Game'}
-          </button>
-        )}
-
-        {/* Back Button */}
-        <button
-          onClick={() => router.push('/')}
-          className="w-full mt-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all"
-        >
-          Leave Lobby
-        </button>
+          </Card>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

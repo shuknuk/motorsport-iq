@@ -13,9 +13,11 @@ import { SERVER_EVENTS, CLIENT_EVENTS } from './types';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
 
+type Listener = (data: unknown) => void;
+
 class SocketClient {
   private socket: Socket | null = null;
-  private listeners: Map<string, Set<Function>> = new Map();
+  private listeners: Map<string, Set<Listener>> = new Map();
 
   connect(): Socket {
     if (this.socket?.connected) {
@@ -45,21 +47,17 @@ class SocketClient {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('Connected to server');
-      this.emit('connected');
+      this.emit('connected', undefined);
     });
 
     this.socket.on('disconnect', () => {
-      console.log('Disconnected from server');
-      this.emit('disconnected');
+      this.emit('disconnected', undefined);
     });
 
-    this.socket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
+    this.socket.on('connect_error', () => {
       this.emit('error', { message: 'Connection failed' });
     });
 
-    // Server events
     this.socket.on(SERVER_EVENTS.LOBBY_STATE, (state: LobbyState) => {
       this.emit(SERVER_EVENTS.LOBBY_STATE, state);
     });
@@ -125,27 +123,26 @@ class SocketClient {
     });
   }
 
-  // Event subscription
-  on(event: string, callback: Function): () => void {
+  on<T>(event: string, callback: (data: T) => void): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(callback);
 
-    // Return unsubscribe function
+    const typedCallback = callback as unknown as Listener;
+    this.listeners.get(event)?.add(typedCallback);
+
     return () => {
-      this.listeners.get(event)?.delete(callback);
+      this.listeners.get(event)?.delete(typedCallback);
     };
   }
 
-  private emit(event: string, data?: any): void {
+  private emit<T>(event: string, data: T): void {
     const callbacks = this.listeners.get(event);
-    if (callbacks) {
-      callbacks.forEach((cb) => cb(data));
-    }
+    if (!callbacks) return;
+
+    callbacks.forEach((callback) => callback(data));
   }
 
-  // Client actions
   createLobby(username: string, sessionId?: string): void {
     this.socket?.emit(CLIENT_EVENTS.CREATE_LOBBY, { username, sessionId });
   }
@@ -183,7 +180,6 @@ class SocketClient {
   }
 }
 
-// Singleton instance
 let socketClient: SocketClient | null = null;
 
 export function getSocketClient(): SocketClient {

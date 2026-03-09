@@ -1,19 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getSocketClient } from '@/lib/socket';
-import type {
-  LobbyState,
-  QuestionEvent,
-  ResolutionEvent,
-  LeaderboardEntry,
-  RaceSnapshotEvent,
-} from '@/lib/types';
-import { SERVER_EVENTS } from '@/lib/types';
 import QuestionCard from '@/components/QuestionCard';
 import CountdownTimer from '@/components/CountdownTimer';
 import Leaderboard from '@/components/Leaderboard';
+import { getSocketClient } from '@/lib/socket';
+import {
+  SERVER_EVENTS,
+  type LeaderboardEntry,
+  type LobbyState,
+  type QuestionEvent,
+  type RaceSnapshotEvent,
+  type ResolutionEvent,
+} from '@/lib/types';
+import { Button, Card, SectionLabel, ThemeToggle } from '@/components/ui';
 
 export default function GamePage() {
   const params = useParams();
@@ -32,7 +33,6 @@ export default function GamePage() {
 
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
 
-  // Set up socket listeners
   useEffect(() => {
     const socket = getSocketClient();
     socket.connect();
@@ -48,12 +48,15 @@ export default function GamePage() {
         setAnswer(null);
         setResolution(null);
       }),
-      socket.on(SERVER_EVENTS.QUESTION_STATE, (data: { instanceId: string; state: string; cancelledReason?: string }) => {
-        setQuestionState(data.state);
-        if (data.state === 'CANCELLED') {
-          setCurrentQuestion(null);
+      socket.on(
+        SERVER_EVENTS.QUESTION_STATE,
+        (data: { instanceId: string; state: string; cancelledReason?: string }) => {
+          setQuestionState(data.state);
+          if (data.state === 'CANCELLED') {
+            setCurrentQuestion(null);
+          }
         }
-      }),
+      ),
       socket.on(SERVER_EVENTS.QUESTION_LOCKED, () => {
         setQuestionState('LOCKED');
       }),
@@ -82,14 +85,13 @@ export default function GamePage() {
       }),
     ];
 
-    // Try to reconnect
     const userId = localStorage.getItem('msp_user_id');
     if (userId) {
       socket.reconnectLobby(userId);
     }
 
     return () => {
-      unsubscribers.forEach((unsub) => unsub());
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, []);
 
@@ -97,175 +99,135 @@ export default function GamePage() {
     (selectedAnswer: 'YES' | 'NO') => {
       if (!currentQuestion || answer) return;
 
-      const socket = getSocketClient();
-      socket.submitAnswer(currentQuestion.instanceId, selectedAnswer);
+      getSocketClient().submitAnswer(currentQuestion.instanceId, selectedAnswer);
       setAnswer(selectedAnswer);
     },
-    [currentQuestion, answer]
+    [answer, currentQuestion]
   );
 
-  const getTrackStatusColor = (status: string) => {
+  const getTrackStatusLabel = (status: string) => {
     switch (status) {
-      case 'GREEN':
-        return 'bg-green-500';
       case 'SC':
-        return 'bg-yellow-500';
+        return 'Safety Car';
       case 'VSC':
-        return 'bg-yellow-400';
+        return 'Virtual SC';
       case 'RED':
-        return 'bg-red-500';
+        return 'Red Flag';
       default:
-        return 'bg-gray-500';
+        return 'Green Flag';
     }
   };
 
   if (!lobbyState) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
+      <main className="app-shell flex items-center justify-center">
+        <p className="font-display text-2xl uppercase tracking-[0.14em]">Connecting to Race…</p>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black">
-      {/* Header */}
-      <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold text-white">
-              Motorsport <span className="text-red-500">IQ</span>
+    <main className="app-shell swiss-noise relative">
+      <div className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-8">
+        <header className="mb-6 grid gap-4 border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-5 md:grid-cols-[1fr_auto] md:p-6">
+          <div>
+            <SectionLabel index="04" label="Live Session" />
+            <h1 className="mt-2 font-display text-4xl uppercase leading-none tracking-tight md:text-6xl">
+              Lobby {lobbyCode}
             </h1>
-            <span className="text-gray-400 text-sm">Lobby: {lobbyCode}</span>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {raceSnapshot && (
+                <>
+                  <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
+                    Lap {raceSnapshot.lapNumber}
+                  </span>
+                  <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
+                    {getTrackStatusLabel(raceSnapshot.trackStatus)}
+                  </span>
+                  <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
+                    Leader {raceSnapshot.leader}
+                  </span>
+                </>
+              )}
+              {feedStalled && (
+                <span className="border-2 border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_88%)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
+                  Feed Stalled
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            <ThemeToggle />
+            <Button variant="ghost" onClick={() => router.push('/')}>
+              Leave Session
+            </Button>
+          </div>
+        </header>
+
+        <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
+          <div>
+            {currentQuestion && questionState === 'LIVE' && (
+              <Card tone="muted" className="swiss-grid-pattern p-6 md:p-8">
+                <div className="mb-6 flex justify-center">
+                  <CountdownTimer deadline={currentQuestion.answerDeadline} size="lg" />
+                </div>
+                <QuestionCard
+                  questionText={currentQuestion.questionText}
+                  category={currentQuestion.category}
+                  difficulty={currentQuestion.difficulty}
+                  instanceId={currentQuestion.instanceId}
+                  onSubmit={handleSubmitAnswer}
+                  answered={answer}
+                />
+              </Card>
+            )}
+
+            {currentQuestion && questionState === 'LOCKED' && (
+              <Card tone="default" className="p-8 text-center">
+                <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Answers Locked</p>
+                <p className="mt-4 font-display text-4xl uppercase leading-tight">{currentQuestion.questionText}</p>
+                <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">Awaiting lap completion and resolution.</p>
+              </Card>
+            )}
+
+            {resolution && (
+              <Card tone="default" className="p-6 md:p-8">
+                <SectionLabel index="04A" label="Resolution" className="mb-4" />
+                <h2 className="font-display text-4xl uppercase leading-tight md:text-5xl">{resolution.questionText}</h2>
+                <p className="mt-3 font-display text-sm uppercase tracking-[0.16em] text-[var(--color-muted-fg)]">
+                  Correct Answer: <span className="text-[var(--color-accent)]">{resolution.correctAnswer}</span>
+                </p>
+                <div className="mt-5 border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-4">
+                  <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Explanation</p>
+                  <p className="mt-2 font-body text-sm leading-relaxed">{resolution.explanation}</p>
+                </div>
+              </Card>
+            )}
+
+            {!currentQuestion && !resolution && (
+              <Card tone="default" className="swiss-dots p-10 text-center md:p-16">
+                <p className="font-display text-4xl uppercase md:text-6xl">Waiting for Question</p>
+                <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
+                  Next trigger arrives from live race telemetry.
+                </p>
+                <p className="mt-4 font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                  Questions asked: {lobbyState.questionCount}/10
+                </p>
+              </Card>
+            )}
           </div>
 
-          {/* Race Status */}
-          {raceSnapshot && (
-            <div className="flex items-center gap-4">
-              {feedStalled && (
-                <span className="text-yellow-400 text-sm animate-pulse">⚠️ Data Feed Stalled</span>
-              )}
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${getTrackStatusColor(raceSnapshot.trackStatus)}`} />
-                <span className="text-gray-300 text-sm">
-                  Lap {raceSnapshot.lapNumber}
-                </span>
-              </div>
-              <div className="text-gray-400 text-sm">
-                Leader: {raceSnapshot.leader}
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={() => router.push('/')}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
-          >
-            Leave
-          </button>
-        </div>
+          <aside>
+            <Leaderboard entries={leaderboard} currentUserId={currentUserId ?? undefined} />
+          </aside>
+        </section>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto p-4 flex gap-6">
-        {/* Left Side - Question */}
-        <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh]">
-          {/* Current Question */}
-          {currentQuestion && questionState === 'LIVE' && (
-            <div className="w-full max-w-md">
-              <div className="mb-6 flex items-center justify-center">
-                <CountdownTimer deadline={currentQuestion.answerDeadline} size="lg" />
-              </div>
-              <QuestionCard
-                questionText={currentQuestion.questionText}
-                category={currentQuestion.category}
-                difficulty={currentQuestion.difficulty}
-                instanceId={currentQuestion.instanceId}
-                onSubmit={handleSubmitAnswer}
-                answered={answer}
-              />
-            </div>
-          )}
-
-          {/* Question Locked */}
-          {currentQuestion && questionState === 'LOCKED' && (
-            <div className="w-full max-w-md">
-              <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 text-center">
-                <div className="text-gray-400 mb-2">Answers Locked</div>
-                <div className="text-white text-lg">{currentQuestion.questionText}</div>
-                <div className="mt-4 text-gray-500">Waiting for outcome...</div>
-              </div>
-            </div>
-          )}
-
-          {/* Resolution */}
-          {resolution && (
-            <div className="w-full max-w-md">
-              <div
-                className={`rounded-xl p-6 border ${
-                  answer === resolution.correctAnswer
-                    ? 'bg-green-500/20 border-green-500'
-                    : answer
-                    ? 'bg-red-500/20 border-red-500'
-                    : 'bg-gray-800/50 border-gray-700'
-                }`}
-              >
-                <div className="text-center mb-4">
-                  <div className="text-4xl mb-2">
-                    {answer === resolution.correctAnswer ? '✅' : answer ? '❌' : '⏭️'}
-                  </div>
-                  <div className="text-xl font-bold text-white">
-                    {answer === resolution.correctAnswer
-                      ? 'Correct!'
-                      : answer
-                      ? 'Wrong!'
-                      : 'No Answer'}
-                  </div>
-                  {answer && (
-                    <div className="text-gray-400 mt-1">
-                      The answer was <span className="font-bold text-white">{resolution.correctAnswer}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-white text-lg mb-4 text-center">
-                  {resolution.questionText}
-                </div>
-
-                <div className="bg-gray-900/50 rounded-lg p-4">
-                  <div className="text-sm text-gray-400 mb-1">Explanation</div>
-                  <div className="text-gray-200">{resolution.explanation}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Waiting for Question */}
-          {!currentQuestion && !resolution && (
-            <div className="text-center">
-              <div className="text-gray-400 text-xl mb-2">Waiting for next question...</div>
-              <div className="text-gray-500 text-sm">
-                Questions will appear automatically during the race
-              </div>
-              <div className="mt-8 text-gray-600">
-                Questions asked: {lobbyState.questionCount}/10
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Side - Leaderboard */}
-        <div className="w-80">
-          <Leaderboard entries={leaderboard} currentUserId={currentUserId ?? undefined} />
-        </div>
-      </div>
-
-      {/* Error Toast */}
       {error && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 px-6 py-3 bg-red-500 text-white rounded-lg shadow-lg">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 border-2 border-[var(--color-accent)] bg-[var(--color-bg)] px-6 py-3 font-display text-xs uppercase tracking-[0.14em] text-[var(--color-fg)]">
           {error}
         </div>
       )}
-    </div>
+    </main>
   );
 }
