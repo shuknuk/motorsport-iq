@@ -1,0 +1,10 @@
+{
+  "name": "motorsport-iq",
+  "private": true,
+  "scripts": {
+    "railway": "node_modules/.bin/railway"
+  },
+  "devDependencies": {
+    "@railway/cli": "^4.31.0"
+  }
+}
