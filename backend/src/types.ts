@@ -19,6 +19,7 @@ export interface DriverState {
 
 // Track status types
 export type TrackStatus = 'GREEN' | 'SC' | 'VSC' | 'RED';
+export type SessionMode = 'live' | 'replay';
 
 // Race snapshot built on each lap completion
 export interface RaceSnapshot {
@@ -26,6 +27,9 @@ export interface RaceSnapshot {
   lapNumber: number;
   totalLaps: number | null;
   trackStatus: TrackStatus;
+  sessionMode: SessionMode;
+  replaySpeed: number | null;
+  isReplayComplete: boolean;
   drivers: DriverState[];
   timestamp: Date;
   dataFeedStalled: boolean;
@@ -47,6 +51,11 @@ export interface OpenF1Session {
   circuit_key: number;
   circuit_short_name: string;
   year: number;
+}
+
+export interface SessionInfo extends OpenF1Session {
+  isCompleted: boolean;
+  mode: SessionMode;
 }
 
 export interface OpenF1Driver {
@@ -138,10 +147,8 @@ export interface OpenF1RaceControl {
 export type QuestionCategory =
   | 'OVERTAKE'
   | 'PIT_WINDOW'
-  | 'ENERGY_BATTLE'
-  | 'FINISH_POSITION'
-  | 'STRATEGY'
-  | 'GAP_CLOSING';
+  | 'GAP_CLOSING'
+  | 'FINISH_POSITION';
 
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
@@ -208,6 +215,9 @@ export interface LobbyState {
   hostId: string;
   sessionId: string | null;
   status: 'waiting' | 'active' | 'finished';
+  sessionMode: SessionMode | null;
+  replaySpeed: number | null;
+  isReplayComplete: boolean;
   players: PlayerState[];
   currentQuestion: QuestionInstanceState | null;
   questionCount: number;
@@ -236,12 +246,13 @@ export interface LeaderboardEntryState {
 // Derived signals (used for trigger evaluation)
 export interface DerivedSignals {
   closingTrend: Map<number, boolean>; // driverNumber -> isClosing
+  withinOneSecond: Map<number, boolean>; // driverNumber -> within 1s of car ahead
+  overtakeOpportunity: Map<number, boolean>; // driverNumber -> close and closing
   pitWindowOpen: Map<number, boolean>; // driverNumber -> inPitWindow
   tyreCliffRisk: Map<number, boolean>; // driverNumber -> atTyreCliff
-  undercutWindow: Map<number, boolean>; // driverNumber -> undercutOpportunity
-  energyAdvantage: Map<number, { attacker: number; defender: number }[]>; // DRS battles
+  lateRacePhase: boolean;
+  podiumStabilityTrend: boolean;
   closeBattles: { attacker: number; defender: number; gap: number }[];
-  recentPitters: number[]; // driverNumbers who pitted recently
 }
 
 // Socket event types
@@ -281,6 +292,9 @@ export interface RaceSnapshotEvent {
   sessionId: string;
   lapNumber: number;
   trackStatus: TrackStatus;
+  sessionMode: SessionMode;
+  replaySpeed: number | null;
+  isReplayComplete: boolean;
   leader: string;
   topThree: string[];
   dataFeedStalled: boolean;

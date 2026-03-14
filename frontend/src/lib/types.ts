@@ -1,7 +1,8 @@
 // Socket.io event types for the frontend
 
 export type TrackStatus = 'GREEN' | 'SC' | 'VSC' | 'RED';
-export type QuestionCategory = 'PIT_WINDOW' | 'STRATEGY' | 'OVERTAKE' | 'ENERGY_BATTLE' | 'GAP_CLOSING' | 'FINISH_POSITION';
+export type SessionMode = 'live' | 'replay';
+export type QuestionCategory = 'OVERTAKE' | 'PIT_WINDOW' | 'GAP_CLOSING' | 'FINISH_POSITION';
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type QuestionState = 'TRIGGERED' | 'LIVE' | 'LOCKED' | 'ACTIVE' | 'RESOLVED' | 'EXPLAINED' | 'CLOSED' | 'CANCELLED';
 
@@ -76,6 +77,9 @@ export interface LobbyState {
   hostId: string;
   sessionId: string | null;
   status: 'waiting' | 'active' | 'finished';
+  sessionMode: SessionMode | null;
+  replaySpeed: number | null;
+  isReplayComplete: boolean;
   players: PlayerState[];
   currentQuestion: QuestionInstanceState | null;
   questionCount: number;
@@ -118,6 +122,9 @@ export interface RaceSnapshotEvent {
   sessionId: string;
   lapNumber: number;
   trackStatus: TrackStatus;
+  sessionMode: SessionMode;
+  replaySpeed: number | null;
+  isReplayComplete: boolean;
   leader: string;
   topThree: string[];
   dataFeedStalled: boolean;
@@ -134,6 +141,8 @@ export interface SessionInfo {
   country_name: string;
   circuit_short_name: string;
   year: number;
+  isCompleted: boolean;
+  mode: SessionMode;
 }
 
 // Socket event names

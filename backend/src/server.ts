@@ -9,9 +9,9 @@ import {
   createLobby,
   joinLobby,
   getLobbyState,
-  getLobbyByCode,
   updateLobbyStatus,
   setLobbySession,
+  setLobbyRuntimeMeta,
   updatePlayerConnection,
   removePlayer,
   getUserLobby,
@@ -24,9 +24,10 @@ import {
   resumeQuestion,
   clearAllTimers,
 } from './lobby/lifecycleManager';
-import { getOpenF1Client, OpenF1Client } from './data/openf1Client';
-import { getSnapshotStore, SnapshotStore } from './data/snapshotStore';
+import { generateQuestionText } from './ai/explanationGenerator';
+import { OpenF1Client } from './data/openf1Client';
 import { selectQuestion, clearCooldowns } from './engine/questionEngine';
+import { SessionRuntimeManager, toSessionInfo } from './runtime/sessionRuntimeManager';
 
 const app = express();
 const httpServer = createServer(app);
@@ -76,59 +77,51 @@ app.get('/health/supabase', async (req, res) => {
   }
 });
 
-// OpenF1 client and snapshot store
-let openF1Client: OpenF1Client;
-let snapshotStore: SnapshotStore;
+const sessionLookupClient = new OpenF1Client();
+const runtimeManager = new SessionRuntimeManager({
+  onSnapshotUpdate: (snapshot, lobbyIds) => {
+    broadcastRaceSnapshot(snapshot, lobbyIds);
+  },
+  onLapComplete: async (snapshot, lobbyIds) => {
+    for (const lobbyId of lobbyIds) {
+      await checkAndResolveQuestion(lobbyId, snapshot);
+      await checkAndTriggerQuestion(lobbyId, snapshot);
+    }
+  },
+  onFeedStall: (stalled, lobbyIds) => {
+    for (const lobbyId of lobbyIds) {
+      io.to(lobbyId).emit('feed_status', { stalled });
+    }
+  },
+  onReplayComplete: async (snapshot, lobbyIds) => {
+    for (const lobbyId of lobbyIds) {
+      await updateLobbyStatus(lobbyId, 'finished');
+      setLobbyRuntimeMeta(lobbyId, { isReplayComplete: true });
+      clearCooldowns(lobbyId);
 
-// Active session tracking
-const activeSessions: Map<string, { lobbyIds: Set<string> }> = new Map();
-
-/**
- * Initialize OpenF1 client and snapshot store
- */
-function initializeDataLayer(): void {
-  openF1Client = getOpenF1Client({
-    onLapCompletion: async (lap) => {
-      console.log(`Lap ${lap.lap_number} completed by driver ${lap.driver_number}`);
-
-      // Check for question resolution for all active lobbies in this session
-      for (const [sessionId, data] of activeSessions) {
-        if (sessionId === String(lap.session_key)) {
-          const snapshot = snapshotStore.getCurrentSnapshot();
-          if (snapshot) {
-            for (const lobbyId of data.lobbyIds) {
-              await checkAndResolveQuestion(lobbyId, snapshot);
-            }
-          }
-        }
+      const lobbyState = await getLobbyState(lobbyId);
+      if (snapshot) {
+        io.to(lobbyId).emit('race_snapshot_update', {
+          sessionId: snapshot.sessionId,
+          lapNumber: snapshot.lapNumber,
+          trackStatus: snapshot.trackStatus,
+          sessionMode: snapshot.sessionMode,
+          replaySpeed: snapshot.replaySpeed,
+          isReplayComplete: true,
+          leader: snapshot.drivers[0]?.name ?? '',
+          topThree: snapshot.drivers.slice(0, 3).map((driver) => driver.name),
+          dataFeedStalled: snapshot.dataFeedStalled,
+        });
       }
-    },
-    onFeedStall: (stalled) => {
-      console.log(`Data feed ${stalled ? 'stalled' : 'recovered'}`);
-      io.emit('feed_status', { stalled });
-    },
-    onError: (error) => {
-      console.error('OpenF1 client error:', error);
-    },
-  });
-
-  snapshotStore = getSnapshotStore({
-    onSnapshotUpdate: (snapshot) => {
-      // Broadcast race snapshot to all clients in session lobbies
-      broadcastRaceSnapshot(snapshot);
-    },
-    onLapComplete: async (snapshot) => {
-      // Check for new questions
-      for (const [sessionId, data] of activeSessions) {
-        if (sessionId === snapshot.sessionId) {
-          for (const lobbyId of data.lobbyIds) {
-            await checkAndTriggerQuestion(lobbyId, snapshot);
-          }
-        }
+      if (lobbyState) {
+        io.to(lobbyId).emit('lobby_state', lobbyState);
       }
-    },
-  });
-}
+    }
+  },
+  onError: (error) => {
+    console.error('Session runtime error:', error);
+  },
+});
 
 /**
  * Check and trigger a new question for a lobby
@@ -150,7 +143,7 @@ async function checkAndTriggerQuestion(lobbyId: string, snapshot: RaceSnapshot):
   }
 
   // Try to select a new question
-  const previousSnapshot = snapshotStore.getPreviousSnapshot();
+  const previousSnapshot = runtimeManager.getRuntime(snapshot.sessionId)?.getPreviousSnapshot() ?? null;
   const newQuestion = selectQuestion(
     snapshot,
     previousSnapshot,
@@ -160,6 +153,7 @@ async function checkAndTriggerQuestion(lobbyId: string, snapshot: RaceSnapshot):
   );
 
   if (newQuestion) {
+    newQuestion.questionText = await generateQuestionText(newQuestion);
     console.log(`Triggering question ${newQuestion.questionId} for lobby ${lobbyId}`);
 
     // Broadcast question event
@@ -253,19 +247,19 @@ async function handleResolution(
 /**
  * Broadcast race snapshot to relevant lobbies
  */
-function broadcastRaceSnapshot(snapshot: RaceSnapshot): void {
-  const sessionData = activeSessions.get(snapshot.sessionId);
-  if (sessionData) {
-    for (const lobbyId of sessionData.lobbyIds) {
-      io.to(lobbyId).emit('race_snapshot_update', {
-        sessionId: snapshot.sessionId,
-        lapNumber: snapshot.lapNumber,
-        trackStatus: snapshot.trackStatus,
-        leader: snapshot.drivers[0]?.name ?? '',
-        topThree: snapshot.drivers.slice(0, 3).map((d) => d.name),
-        dataFeedStalled: snapshot.dataFeedStalled,
-      });
-    }
+function broadcastRaceSnapshot(snapshot: RaceSnapshot, lobbyIds: Set<string>): void {
+  for (const lobbyId of lobbyIds) {
+    io.to(lobbyId).emit('race_snapshot_update', {
+      sessionId: snapshot.sessionId,
+      lapNumber: snapshot.lapNumber,
+      trackStatus: snapshot.trackStatus,
+      sessionMode: snapshot.sessionMode,
+      replaySpeed: snapshot.replaySpeed,
+      isReplayComplete: snapshot.isReplayComplete,
+      leader: snapshot.drivers[0]?.name ?? '',
+      topThree: snapshot.drivers.slice(0, 3).map((d) => d.name),
+      dataFeedStalled: snapshot.dataFeedStalled,
+    });
   }
 }
 
@@ -343,36 +337,56 @@ io.on('connection', (socket) => {
   /**
    * Start the session (host only)
    */
-  socket.on('start_session', async (data: { lobbyId: string; sessionId: string }) => {
+  socket.on('start_session', async (data: { lobbyId: string; sessionId: string; userId?: string | null }) => {
     try {
       const lobbyState = await getLobbyState(data.lobbyId);
       if (!lobbyState) {
         throw new Error('Lobby not found');
       }
 
-      if (lobbyState.hostId !== currentUserId) {
+      const actingUserId = currentUserId ?? data.userId ?? null;
+      if (!actingUserId || lobbyState.hostId !== actingUserId) {
         throw new Error('Only the host can start the session');
+      }
+
+      currentUserId = actingUserId;
+      currentLobbyId = data.lobbyId;
+
+      const session = await sessionLookupClient.getSession(parseInt(data.sessionId, 10));
+      if (!session) {
+        throw new Error('OpenF1 session not found');
+      }
+      if (new Date(session.date_end).getTime() >= Date.now()) {
+        throw new Error('This session has not completed yet');
       }
 
       // Update lobby status
       await updateLobbyStatus(data.lobbyId, 'active');
       await setLobbySession(data.lobbyId, data.sessionId);
 
-      // Track session
-      if (!activeSessions.has(data.sessionId)) {
-        activeSessions.set(data.sessionId, { lobbyIds: new Set() });
-      }
-      activeSessions.get(data.sessionId)!.lobbyIds.add(data.lobbyId);
-
-      // Initialize OpenF1 client for this session
-      openF1Client.setSession(parseInt(data.sessionId));
-      await snapshotStore.initialize(parseInt(data.sessionId));
-      openF1Client.startPolling();
+      const runtime = await runtimeManager.attachLobbyToSession(data.lobbyId, session);
+      setLobbyRuntimeMeta(data.lobbyId, {
+        sessionMode: runtime.mode,
+        replaySpeed: runtime.replaySpeed,
+        isReplayComplete: false,
+      });
 
       // Notify all players
       io.to(data.lobbyId).emit('session_started', {
         sessionId: data.sessionId,
+        mode: runtime.mode,
+        replaySpeed: runtime.replaySpeed,
       });
+
+      const refreshedLobbyState = await getLobbyState(data.lobbyId);
+      if (refreshedLobbyState) {
+        io.to(data.lobbyId).emit('lobby_state', refreshedLobbyState);
+      }
+
+      const snapshot = runtime.getCurrentSnapshot();
+      if (snapshot) {
+        broadcastRaceSnapshot(snapshot, new Set([data.lobbyId]));
+      }
 
       console.log(`Session ${data.sessionId} started for lobby ${lobbyState.code}`);
     } catch (error) {
@@ -425,6 +439,23 @@ io.on('connection', (socket) => {
       // Send current state
       socket.emit('lobby_state', lobbyState);
 
+      if (lobbyState.sessionId) {
+        const snapshot = runtimeManager.getRuntime(lobbyState.sessionId)?.getCurrentSnapshot();
+        if (snapshot) {
+          socket.emit('race_snapshot_update', {
+            sessionId: snapshot.sessionId,
+            lapNumber: snapshot.lapNumber,
+            trackStatus: snapshot.trackStatus,
+            sessionMode: snapshot.sessionMode,
+            replaySpeed: snapshot.replaySpeed,
+            isReplayComplete: snapshot.isReplayComplete,
+            leader: snapshot.drivers[0]?.name ?? '',
+            topThree: snapshot.drivers.slice(0, 3).map((driver) => driver.name),
+            dataFeedStalled: snapshot.dataFeedStalled,
+          });
+        }
+      }
+
       // Send active question if any
       const activeQuestion = getActiveQuestion(lobbyId);
       if (activeQuestion && activeQuestion.state === 'LIVE') {
@@ -452,8 +483,14 @@ io.on('connection', (socket) => {
   socket.on('get_sessions', async (data: { year?: number }) => {
     try {
       const year = data?.year || new Date().getFullYear();
-      const sessions = await openF1Client.getSessions(year);
-      socket.emit('sessions_list', sessions);
+      const sessions = await sessionLookupClient.getSessions(year);
+      const supportedSessions = (sessions ?? [])
+        .filter((session) => ['Race', 'Sprint'].includes(session.session_name))
+        .sort(
+          (a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime()
+        )
+        .map((session) => toSessionInfo(session));
+      socket.emit('sessions_list', supportedSessions);
     } catch (error) {
       socket.emit('error', { message: 'Failed to fetch sessions' });
     }
@@ -489,7 +526,6 @@ io.on('connection', (socket) => {
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
   clearAllTimers();
-  openF1Client?.stopPolling();
   httpServer.close(() => {
     console.log('Server closed');
     process.exit(0);
@@ -499,7 +535,6 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully...');
   clearAllTimers();
-  openF1Client?.stopPolling();
   httpServer.close(() => {
     console.log('Server closed');
     process.exit(0);
@@ -507,7 +542,6 @@ process.on('SIGINT', () => {
 });
 
 // Start server
-initializeDataLayer();
 httpServer.listen(PORT, () => {
   console.log(`Motorsport IQ server running on port ${PORT}`);
 });

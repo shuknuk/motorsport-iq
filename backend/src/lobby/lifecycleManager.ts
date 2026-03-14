@@ -5,9 +5,10 @@ import type { QuestionInstance, Answer } from '../db/types';
 import supabase from '../db/supabaseClient';
 import { getLobbyState, setCurrentQuestion, incrementQuestionCount, updateLeaderboardCache } from './lobbyManager';
 import { resolveQuestion, shouldCancel, shouldPause, shouldResume, shouldResolve } from '../engine/resolutionEngine';
+import { recordResolution } from '../engine/questionEngine';
 import { calculateScore } from '../engine/scoringEngine';
 import { getQuestionById } from '../engine/questionBank';
-import { v4 as uuidv4 } from 'uuid';
+import { generateResolutionExplanation } from '../ai/explanationGenerator';
 
 /**
  * Lifecycle Manager - Question FSM and state transitions
@@ -286,19 +287,29 @@ async function resolveQuestionInstance(
 ): Promise<void> {
   // Get resolution
   const result = resolveQuestion(instance, currentSnapshot);
+  const question = getQuestionById(instance.questionId);
+  const explanation = await generateResolutionExplanation(
+    instance,
+    currentSnapshot,
+    result.outcome,
+    result.explanation
+  );
 
   // Update instance
   instance.state = 'RESOLVED';
   instance.outcome = result.outcome;
   instance.answer = result.correctAnswer;
-  instance.explanation = result.explanation;
+  instance.explanation = explanation;
   instance.resolvedAt = new Date();
+  if (question) {
+    recordResolution(instance.lobbyId, question.category, currentSnapshot.lapNumber);
+  }
 
   // Update database
   await updateQuestionState(instance.id, 'RESOLVED', {
     answer: result.correctAnswer,
     outcome: result.outcome,
-    explanation: result.explanation,
+    explanation,
     resolved_at: instance.resolvedAt.toISOString(),
   });
 
@@ -318,7 +329,7 @@ async function resolveQuestionInstance(
       instance: { ...instance },
       outcome: result.outcome,
       correctAnswer: result.correctAnswer,
-      explanation: result.explanation,
+      explanation,
     });
 
     // EXPLAINED -> CLOSED

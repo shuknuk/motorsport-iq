@@ -1,24 +1,44 @@
-# 🎯 Question Triggers & F1 Data Signals
+# MVP Question Triggers & Signals
 
-## 📐 Priority Hierarchy
-When multiple question types are eligible, always trigger the highest priority:
-1.  **PIT** (Highest)
-2.  **STRATEGY**
-3.  **OVERTAKE**
-4.  **ENERGY_BATTLE**
-5.  **GAP_CLOSING**
-6.  **FINISH_POSITION** (Lowest)
+## Allowed Categories
+1. `OVERTAKE`
+2. `PIT_WINDOW`
+3. `GAP_CLOSING`
+4. `FINISH_POSITION`
 
-## 📊 Derived Signals (Trigger Conditions)
-These functions in `backend/src/engine/derivedSignals.ts` define how data becomes a question:
+Anything outside these four categories is out of MVP scope.
 
-- **closingTrend**: Gap between two drivers (Attacker and Defender) is decreasing by > 0.1s per lap.
-- **pitWindowOpen**: `tyreAge` >= 15 laps AND driver has fewer stops than the current front-runner.
-- **tyreCliffRisk**: `tyreAge` >= 25 laps.
-- **undercutWindow**: Gap between two drivers is < 3.0s AND `pitWindowOpen` is true for the trailing driver.
-- **energyAdvantage**: DRS active on the attacker but NOT on the defender (OpenF1 `drsEnabled`).
+## Derived Signals
+- `ClosingTrend`: interval to the car ahead decreases across consecutive laps.
+- `WithinOneSecond`: interval to the car ahead is `<= 1.0s`.
+- `OvertakeOpportunity`: close battle plus `ClosingTrend`.
+- `PitWindowOpen`: tyre age is within roughly 3 laps of the expected stint end.
+- `TyreCliffRisk`: tyre age is high and lap time drops significantly.
+- `LateRacePhase`: at least 60% of race distance complete.
+- `PodiumStabilityTrend`: top-three order and gaps stay stable over recent laps.
 
-## 🚫 Engine Constraints
-- **MAX Questions**: 10 questions per race, per lobby.
-- **Concurrency**: ONLY ONE active question per lobby at any given time.
-- **Time Window**: 20 seconds total for users to answer. (Server-side timer is absolute).
+## Global Guardrails
+- Maximum 1 active question per lobby.
+- Maximum 10 questions per race.
+- No questions on laps `1-3`.
+- No questions while `SC`, `VSC`, or `RED` is active.
+- Enforce a 1-lap cooldown after restart.
+- Do not trigger the same category twice in a row.
+- Enforce a 2-lap cooldown after resolution.
+- Only use 2-lap or 3-lap prediction windows.
+
+## Trigger Priority
+1. `OVERTAKE`
+2. `PIT_WINDOW`
+3. `GAP_CLOSING`
+4. `FINISH_POSITION`
+
+## Category Mapping
+- `OVERTAKE`
+  - Use when a trailing car is closing quickly and is already in near-overtake range.
+- `PIT_WINDOW`
+  - Use when tyre age or stint profile indicates an imminent stop or a likely stay-out decision.
+- `GAP_CLOSING`
+  - Use when a chaser is compressing the interval but no stronger overtake trigger exists.
+- `FINISH_POSITION`
+  - Use only in `LateRacePhase`.

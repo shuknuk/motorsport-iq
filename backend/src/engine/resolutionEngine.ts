@@ -1,6 +1,6 @@
-import type { RaceSnapshot, DriverState, QuestionInstanceState } from '../types';
+import type { RaceSnapshot, QuestionInstanceState } from '../types';
 import { getQuestionById } from './questionBank';
-import { getDriverByNumber, getDriverByPosition } from './derivedSignals';
+import { getDriverByNumber } from './derivedSignals';
 
 export interface ResolutionResult {
   instanceId: string;
@@ -105,16 +105,16 @@ export function evaluateSuccessCondition(
       return pitCountNow > pitCountBefore && currentSnapshot.lapNumber - instance.triggerSnapshot.lapNumber <= withinLaps;
     }
 
+    case 'noPitStop': {
+      const withinLaps = condition.params.withinLaps as number;
+      const pitCountBefore = triggerDriver1.pitCount;
+      const pitCountNow = currentDriver1.pitCount;
+      return pitCountNow === pitCountBefore && currentSnapshot.lapNumber - instance.triggerSnapshot.lapNumber <= withinLaps;
+    }
+
     case 'overtake': {
       if (!triggerDriver2 || !currentDriver2) return false;
       // Overtake happened if driver1's position improved and they're now ahead of driver2
-      const wasBehind = triggerDriver1.position > triggerDriver2.position;
-      const isAhead = currentDriver1.position < currentDriver2.position;
-      return wasBehind && isAhead;
-    }
-
-    case 'positionSwap': {
-      if (!triggerDriver2 || !currentDriver2) return false;
       const wasBehind = triggerDriver1.position > triggerDriver2.position;
       const isAhead = currentDriver1.position < currentDriver2.position;
       return wasBehind && isAhead;
@@ -129,12 +129,6 @@ export function evaluateSuccessCondition(
       const minGain = condition.params.minGain as number;
       const positionsGained = triggerDriver1.position - currentDriver1.position;
       return positionsGained >= minGain;
-    }
-
-    case 'positionHeld': {
-      if (!triggerDriver2 || !currentDriver2) return false;
-      // Defender held position if they're still ahead of the attacker
-      return currentDriver1.position < currentDriver2.position;
     }
 
     case 'gapReduced': {
@@ -158,57 +152,14 @@ export function evaluateSuccessCondition(
       return currentGap <= targetGap;
     }
 
-    case 'leaderGapReached': {
-      const targetGap = condition.params.targetGap as number;
-      const second = currentSnapshot.drivers[1];
-      return second?.interval !== null && (second?.interval ?? 0) >= targetGap;
-    }
-
-    case 'undercutSuccess': {
-      if (!triggerDriver2 || !currentDriver2) return false;
-      // Undercut worked if driver1 pitted and is now ahead of driver2 who hasn't pitted
-      const driver1Pitted = currentDriver1.pitCount > triggerDriver1.pitCount;
-      const driver2Pitted = currentDriver2.pitCount > triggerDriver2.pitCount;
-      const isAhead = currentDriver1.position < currentDriver2.position;
-      return driver1Pitted && !driver2Pitted && isAhead;
-    }
-
-    case 'overcutSuccess': {
-      if (!triggerDriver2 || !currentDriver2) return false;
-      // Overcut worked if driver2 pitted and driver1 stayed out and is still ahead
-      const driver1Pitted = currentDriver1.pitCount > triggerDriver1.pitCount;
-      const driver2Pitted = currentDriver2.pitCount > triggerDriver2.pitCount;
-      const isAhead = currentDriver1.position < currentDriver2.position;
-      return !driver1Pitted && driver2Pitted && isAhead;
-    }
-
     case 'finalPosition': {
       const maxPosition = condition.params.maxPosition as number;
-      // For this to resolve, the race must be finished or we're past the window
-      if (currentSnapshot.trackStatus !== 'RED' && currentSnapshot.lapNumber < instance.targetLap) {
-        // Race not finished, use current position as proxy
-        return currentDriver1.position <= maxPosition;
-      }
       return currentDriver1.position <= maxPosition;
     }
 
     case 'finishAhead': {
       if (!triggerDriver2 || !currentDriver2) return false;
       return currentDriver1.position < currentDriver2.position;
-    }
-
-    case 'pitCountAtEnd': {
-      const maxStops = condition.params.maxStops as number;
-      return currentDriver1.pitCount <= maxStops;
-    }
-
-    case 'lapTimeDelta': {
-      const minDelta = condition.params.minDelta as number;
-      // Check if driver's lap times have degraded
-      const triggerLapTime = triggerDriver1.lastLapTime;
-      const currentLapTime = currentDriver1.lastLapTime;
-      if (!triggerLapTime || !currentLapTime) return false;
-      return currentLapTime - triggerLapTime >= minDelta;
     }
 
     default:
@@ -240,11 +191,11 @@ export function generateExplanation(
     case 'pitStop':
       return `${yesNo}! ${driver1Name} ${didDidNot} pit within the specified window. Tyre age was ${triggerDriver1?.tyreAge ?? 0} laps at trigger.`;
 
+    case 'noPitStop':
+      return `${yesNo}! ${driver1Name} ${outcome ? 'stayed out' : 'came in'} during the prediction window.`;
+
     case 'overtake':
       return `${yesNo}! ${driver1Name} ${didDidNot} overtake ${driver2Name}. Position change: ${triggerDriver1?.position} → ${currentDriver1?.position}.`;
-
-    case 'positionSwap':
-      return `${yesNo}! ${driver1Name} ${didDidNot} let ${driver2Name} pass. New positions: ${driver1Name} P${currentDriver1?.position}, ${driver2Name} ahead.`;
 
     case 'positionReached':
       return `${yesNo}! ${driver1Name} ${outcome ? 'reached' : 'did not reach'} the target position. Current: P${currentDriver1?.position}.`;
@@ -253,29 +204,17 @@ export function generateExplanation(
       const positionsGained = (triggerDriver1?.position ?? 0) - (currentDriver1?.position ?? 0);
       return `${yesNo}! ${driver1Name} gained ${positionsGained} position(s). Started P${triggerDriver1?.position}, now P${currentDriver1?.position}.`;
 
-    case 'positionHeld':
-      return `${yesNo}! ${driver1Name} ${outcome ? 'successfully defended' : 'could not defend against'} ${driver2Name}.`;
-
     case 'gapReduced':
       return `${yesNo}! The gap ${outcome ? 'decreased' : 'did not decrease enough'} between ${driver1Name} and ${driver2Name}.`;
 
     case 'gapReached':
       return `${yesNo}! ${driver1Name} ${outcome ? 'closed to within' : 'did not close to'} the target gap to ${driver2Name}.`;
 
-    case 'undercutSuccess':
-      return `${yesNo}! The undercut ${outcome ? 'worked' : 'did not work'} for ${driver1Name}.`;
-
-    case 'overcutSuccess':
-      return `${yesNo}! The overcut ${outcome ? 'worked' : 'did not work'} for ${driver1Name}.`;
-
     case 'finalPosition':
       return `${yesNo}! ${driver1Name} ${outcome ? 'finished in' : 'did not finish in'} the target position. Final: P${currentDriver1?.position}.`;
 
     case 'finishAhead':
       return `${yesNo}! ${driver1Name} finished ${outcome ? 'ahead of' : 'behind'} ${driver2Name}.`;
-
-    case 'pitCountAtEnd':
-      return `${yesNo}! ${driver1Name} made ${currentDriver1?.pitCount ?? 0} pit stop(s).`;
 
     default:
       return `${yesNo}! The prediction ${didDidNot} come true for ${driver1Name}.`;

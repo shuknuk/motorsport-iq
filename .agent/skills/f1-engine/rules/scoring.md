@@ -1,7 +1,7 @@
-# 🏆 Scoring & Penalties Rules
+# 🏆 MVP Scoring & Penalties Rules
 
 ## ⚖️ Core Point System
-These points are awarded by the `scoringEngine.ts` upon resolution:
+These points are awarded by the server upon deterministic resolution:
 
 | Outcome | Points |
 | --- | --- |

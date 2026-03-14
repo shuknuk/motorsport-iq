@@ -131,7 +131,10 @@ export default function GamePage() {
       <div className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-8">
         <header className="mb-6 grid gap-4 border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-5 md:grid-cols-[1fr_auto] md:p-6">
           <div>
-            <SectionLabel index="04" label="Live Session" />
+            <SectionLabel
+              index="04"
+              label={lobbyState.sessionMode === 'replay' ? 'Replay Session' : 'Live Session'}
+            />
             <h1 className="mt-2 font-display text-4xl uppercase leading-none tracking-tight md:text-6xl">
               Lobby {lobbyCode}
             </h1>
@@ -147,6 +150,16 @@ export default function GamePage() {
                   <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
                     Leader {raceSnapshot.leader}
                   </span>
+                  {raceSnapshot.sessionMode === 'replay' && (
+                    <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
+                      Replay {raceSnapshot.replaySpeed}x
+                    </span>
+                  )}
+                  {raceSnapshot.isReplayComplete && (
+                    <span className="border-2 border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_88%)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
+                      Replay Complete
+                    </span>
+                  )}
                 </>
               )}
               {feedStalled && (
@@ -208,7 +221,11 @@ export default function GamePage() {
               <Card tone="default" className="swiss-dots p-10 text-center md:p-16">
                 <p className="font-display text-4xl uppercase md:text-6xl">Waiting for Question</p>
                 <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
-                  Next trigger arrives from live race telemetry.
+                  {lobbyState.isReplayComplete
+                    ? 'Replay finished. Final leaderboard is locked in.'
+                    : lobbyState.sessionMode === 'replay'
+                      ? 'Next trigger arrives from accelerated historical telemetry.'
+                      : 'Next trigger arrives from live race telemetry.'}
                 </p>
                 <p className="mt-4 font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
                   Questions asked: {lobbyState.questionCount}/10

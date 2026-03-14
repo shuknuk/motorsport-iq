@@ -69,8 +69,14 @@ export default function LobbyPage() {
       }),
       socket.on(SERVER_EVENTS.SESSIONS_LIST, (sessionList: SessionInfo[]) => {
         setSessions(sessionList);
-        if (sessionList.length > 0 && !selectedSession) {
-          setSelectedSession(String(sessionList[0].session_key));
+        if (sessionList.length > 0) {
+          const firstCompleted = sessionList.find((session) => session.isCompleted);
+          setSelectedSession((current) => {
+            if (current && sessionList.some((session) => String(session.session_key) === current)) {
+              return current;
+            }
+            return firstCompleted ? String(firstCompleted.session_key) : String(sessionList[0].session_key);
+          });
         }
       }),
       socket.on(SERVER_EVENTS.ERROR, ({ message }: { message: string }) => {
@@ -89,7 +95,7 @@ export default function LobbyPage() {
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [lobbyCode, router, selectedSession, selectedYear]);
+  }, [lobbyCode, router, selectedYear]);
 
   const handleCopyCode = useCallback(() => {
     navigator.clipboard.writeText(lobbyCode);
@@ -103,18 +109,28 @@ export default function LobbyPage() {
       return;
     }
 
+    const selectedSessionInfo = sessions.find((session) => String(session.session_key) === selectedSession);
+    if (!selectedSessionInfo?.isCompleted) {
+      setError('This session has not completed yet');
+      return;
+    }
+
     if (lobbyState.players.length < 1) {
       setError('Need at least 1 player to start');
       return;
     }
 
     setIsStarting(true);
-    getSocketClient().startSession(lobbyState.id, selectedSession);
-  }, [lobbyState, selectedSession]);
+    getSocketClient().startSession(lobbyState.id, selectedSession, currentUserId);
+  }, [currentUserId, lobbyState, selectedSession, sessions]);
 
   const isHost = lobbyState?.hostId === currentUserId;
+  const selectedSessionInfo = sessions.find((session) => String(session.session_key) === selectedSession) ?? null;
 
-  const years = useMemo(() => [2026, 2025, 2024, 2023], []);
+  const years = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: currentYear - 2022 }, (_, index) => currentYear - index);
+  }, []);
 
   if (isLoading) {
     return (
@@ -223,27 +239,39 @@ export default function LobbyPage() {
                     >
                       <option value="">Select Session...</option>
                       {sessions.map((session) => (
-                        <option key={session.session_key} value={session.session_key}>
-                          {session.session_name} - {session.location} ({session.year})
+                        <option
+                          key={session.session_key}
+                          value={session.session_key}
+                          disabled={!session.isCompleted}
+                        >
+                          {session.session_name} - {session.location} ({session.year}) · {session.isCompleted ? 'Replay' : 'Upcoming'}
                         </option>
                       ))}
                     </select>
                   </label>
                 </div>
 
+                {selectedSessionInfo && (
+                  <p className="mt-4 border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-3 font-display text-xs uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">
+                    {selectedSessionInfo.isCompleted
+                      ? 'Historical replay starts from race green flag at 10x speed.'
+                      : 'This session has not completed yet and cannot be started.'}
+                  </p>
+                )}
+
                 {sessions.length === 0 && (
                   <p className="mt-4 border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-3 font-display text-xs uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">
-                    No active sessions detected. Waiting for race feed.
+                    No race or sprint sessions found for this season.
                   </p>
                 )}
 
                 <Button
                   onClick={handleStartGame}
-                  disabled={isStarting || !selectedSession}
+                  disabled={isStarting || !selectedSession || !selectedSessionInfo?.isCompleted}
                   size="lg"
                   className="mt-6 w-full"
                 >
-                  {isStarting ? 'Starting Session...' : 'Start Race Session'}
+                  {isStarting ? 'Starting Session...' : selectedSessionInfo?.isCompleted ? 'Start Race Session' : 'Session Unavailable'}
                 </Button>
               </>
             ) : (

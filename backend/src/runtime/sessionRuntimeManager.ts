@@ -1,0 +1,280 @@
+import { OpenF1Client } from '../data/openf1Client';
+import { SnapshotStore } from '../data/snapshotStore';
+import type {
+  OpenF1Interval,
+  OpenF1Lap,
+  OpenF1Pit,
+  OpenF1Position,
+  OpenF1RaceControl,
+  OpenF1Session,
+  RaceSnapshot,
+  SessionMode,
+} from '../types';
+import { buildReplayTimeline, type ReplayEvent } from './replayTimeline';
+
+const REPLAY_SPEED = 10;
+
+interface RuntimeCallbacks {
+  onSnapshotUpdate: (snapshot: RaceSnapshot, lobbyIds: Set<string>) => void;
+  onLapComplete: (snapshot: RaceSnapshot, lobbyIds: Set<string>) => Promise<void>;
+  onFeedStall: (stalled: boolean, lobbyIds: Set<string>) => void;
+  onReplayComplete: (snapshot: RaceSnapshot | null, lobbyIds: Set<string>) => Promise<void>;
+  onError: (error: Error) => void;
+}
+
+export interface SessionRuntime {
+  sessionId: string;
+  mode: SessionMode;
+  replaySpeed: number | null;
+  addLobby(lobbyId: string): void;
+  removeLobby(lobbyId: string): void;
+  getLobbyIds(): Set<string>;
+  getCurrentSnapshot(): RaceSnapshot | null;
+  getPreviousSnapshot(): RaceSnapshot | null;
+  start(): Promise<void>;
+  stop(): void;
+}
+
+function cloneLobbyIds(source: Set<string>): Set<string> {
+  return new Set(source);
+}
+
+abstract class BaseRuntime implements SessionRuntime {
+  readonly sessionId: string;
+  readonly mode: SessionMode;
+  readonly replaySpeed: number | null;
+  protected readonly session: OpenF1Session;
+  protected readonly callbacks: RuntimeCallbacks;
+  protected readonly lobbyIds = new Set<string>();
+  protected readonly client: OpenF1Client;
+  protected readonly snapshotStore: SnapshotStore;
+  protected started = false;
+
+  constructor(session: OpenF1Session, mode: SessionMode, replaySpeed: number | null, callbacks: RuntimeCallbacks) {
+    this.session = session;
+    this.sessionId = String(session.session_key);
+    this.mode = mode;
+    this.replaySpeed = replaySpeed;
+    this.callbacks = callbacks;
+
+    this.client = new OpenF1Client({
+      onLapCompletion: (lap) => this.handleLapCompletion(lap),
+      onPositionUpdate: (positions) => this.snapshotStore.processPositionUpdate(positions),
+      onIntervalUpdate: (intervals) => this.snapshotStore.processIntervalUpdate(intervals),
+      onPitUpdate: (pits) => this.snapshotStore.processPitUpdate(pits),
+      onRaceControlUpdate: (messages) => this.snapshotStore.processRaceControlUpdate(messages),
+      onFeedStall: (stalled) => {
+        this.snapshotStore.handleFeedStall(stalled);
+        this.callbacks.onFeedStall(stalled, cloneLobbyIds(this.lobbyIds));
+      },
+      onError: (error) => this.callbacks.onError(error),
+    });
+
+    this.snapshotStore = new SnapshotStore(this.client, {
+      onSnapshotUpdate: (snapshot) => {
+        this.callbacks.onSnapshotUpdate(snapshot, cloneLobbyIds(this.lobbyIds));
+      },
+      onLapComplete: async (snapshot) => {
+        await this.callbacks.onLapComplete(snapshot, cloneLobbyIds(this.lobbyIds));
+      },
+    });
+  }
+
+  addLobby(lobbyId: string): void {
+    this.lobbyIds.add(lobbyId);
+  }
+
+  removeLobby(lobbyId: string): void {
+    this.lobbyIds.delete(lobbyId);
+    if (this.lobbyIds.size === 0) {
+      this.stop();
+    }
+  }
+
+  getLobbyIds(): Set<string> {
+    return cloneLobbyIds(this.lobbyIds);
+  }
+
+  getCurrentSnapshot(): RaceSnapshot | null {
+    return this.snapshotStore.getCurrentSnapshot();
+  }
+
+  getPreviousSnapshot(): RaceSnapshot | null {
+    return this.snapshotStore.getPreviousSnapshot();
+  }
+
+  protected async handleLapCompletion(lap: OpenF1Lap): Promise<void> {
+    this.snapshotStore.processLapCompletion(lap);
+  }
+
+  abstract start(): Promise<void>;
+  abstract stop(): void;
+}
+
+class LiveSessionRuntime extends BaseRuntime {
+  constructor(session: OpenF1Session, callbacks: RuntimeCallbacks) {
+    super(session, 'live', null, callbacks);
+  }
+
+  async start(): Promise<void> {
+    if (this.started) return;
+    this.started = true;
+    this.client.setSession(this.session.session_key);
+    await this.snapshotStore.initialize(this.session.session_key, {
+      sessionMode: 'live',
+      replaySpeed: null,
+    });
+    this.client.startPolling();
+  }
+
+  stop(): void {
+    this.client.stopPolling();
+    this.started = false;
+  }
+}
+
+class ReplaySessionRuntime extends BaseRuntime {
+  private events: ReplayEvent[] = [];
+  private timer: NodeJS.Timeout | null = null;
+  private currentIndex = 0;
+  private complete = false;
+
+  constructor(session: OpenF1Session, callbacks: RuntimeCallbacks) {
+    super(session, 'replay', REPLAY_SPEED, callbacks);
+  }
+
+  async start(): Promise<void> {
+    if (this.started) return;
+    this.started = true;
+    this.client.setSession(this.session.session_key);
+    await this.snapshotStore.initialize(this.session.session_key, {
+      sessionMode: 'replay',
+      replaySpeed: REPLAY_SPEED,
+    });
+
+    const laps = await this.client.fetchLaps();
+    const positions = await this.client.fetchPositions();
+    const intervals = await this.client.fetchIntervals();
+    const pits = await this.client.fetchPits();
+    const raceControl = await this.client.fetchRaceControl();
+
+    this.events = buildReplayTimeline({
+      laps: laps ?? [],
+      positions: positions ?? [],
+      intervals: intervals ?? [],
+      pits: pits ?? [],
+      raceControl: raceControl ?? [],
+    });
+
+    this.runNext();
+  }
+
+  stop(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.started = false;
+  }
+
+  private runNext(): void {
+    if (!this.started) return;
+
+    const currentEvent = this.events[this.currentIndex];
+    if (!currentEvent) {
+      if (!this.complete) {
+        this.complete = true;
+        this.snapshotStore.markReplayComplete();
+        void this.callbacks.onReplayComplete(this.snapshotStore.getCurrentSnapshot(), cloneLobbyIds(this.lobbyIds));
+      }
+      return;
+    }
+
+    this.applyEvent(currentEvent);
+    this.currentIndex += 1;
+
+    const nextEvent = this.events[this.currentIndex];
+    if (!nextEvent) {
+      this.runNext();
+      return;
+    }
+
+    const delayMs = Math.max(0, Math.round((nextEvent.timestamp - currentEvent.timestamp) / REPLAY_SPEED));
+    this.timer = setTimeout(() => this.runNext(), delayMs);
+  }
+
+  private applyEvent(event: ReplayEvent): void {
+    switch (event.type) {
+      case 'race_control':
+        this.snapshotStore.processRaceControlUpdate([event.data as OpenF1RaceControl]);
+        break;
+      case 'position':
+        this.snapshotStore.processPositionUpdate([event.data as OpenF1Position]);
+        break;
+      case 'interval':
+        this.snapshotStore.processIntervalUpdate([event.data as OpenF1Interval]);
+        break;
+      case 'pit':
+        this.snapshotStore.processPitUpdate([event.data as OpenF1Pit]);
+        break;
+      case 'lap':
+        this.snapshotStore.processLapCompletion(event.data as OpenF1Lap);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+export class SessionRuntimeManager {
+  private runtimes = new Map<string, SessionRuntime>();
+  private readonly callbacks: RuntimeCallbacks;
+
+  constructor(callbacks: RuntimeCallbacks) {
+    this.callbacks = callbacks;
+  }
+
+  getSessionMode(session: OpenF1Session): SessionMode {
+    const endDate = new Date(session.date_end).getTime();
+    return endDate < Date.now() ? 'replay' : 'live';
+  }
+
+  async attachLobbyToSession(lobbyId: string, session: OpenF1Session): Promise<SessionRuntime> {
+    const sessionId = String(session.session_key);
+    let runtime = this.runtimes.get(sessionId);
+    if (!runtime) {
+      const mode = this.getSessionMode(session);
+      runtime = mode === 'replay'
+        ? new ReplaySessionRuntime(session, this.callbacks)
+        : new LiveSessionRuntime(session, this.callbacks);
+      this.runtimes.set(sessionId, runtime);
+    }
+
+    runtime.addLobby(lobbyId);
+    await runtime.start();
+    return runtime;
+  }
+
+  detachLobbyFromSession(lobbyId: string, sessionId: string): void {
+    const runtime = this.runtimes.get(sessionId);
+    if (!runtime) return;
+
+    runtime.removeLobby(lobbyId);
+    if (runtime.getLobbyIds().size === 0) {
+      this.runtimes.delete(sessionId);
+    }
+  }
+
+  getRuntime(sessionId: string): SessionRuntime | null {
+    return this.runtimes.get(sessionId) ?? null;
+  }
+}
+
+export function toSessionInfo(session: OpenF1Session): OpenF1Session & { isCompleted: boolean; mode: SessionMode } {
+  const isCompleted = new Date(session.date_end).getTime() < Date.now();
+  return {
+    ...session,
+    isCompleted,
+    mode: isCompleted ? 'replay' : 'live',
+  };
+}

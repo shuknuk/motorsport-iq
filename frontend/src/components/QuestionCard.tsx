@@ -14,10 +14,8 @@ interface QuestionCardProps {
 }
 
 const CATEGORY_LABELS: Record<QuestionCategory, string> = {
-  PIT_WINDOW: 'Pit Window',
-  STRATEGY: 'Strategy',
   OVERTAKE: 'Overtake',
-  ENERGY_BATTLE: 'Energy Battle',
+  PIT_WINDOW: 'Pit Window',
   GAP_CLOSING: 'Gap Closing',
   FINISH_POSITION: 'Finish Position',
 };

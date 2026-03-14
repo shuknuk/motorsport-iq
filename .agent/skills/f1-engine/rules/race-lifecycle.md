@@ -1,24 +1,31 @@
-# 🏎️ Race Lifecycle & Resolution Rules
+# MVP Race Lifecycle & Resolution Rules
 
-## 🚥 Resolution Timing
-- **Lap-Based**: Questions **only** resolve at the end of a lap.
-- **Polling**: OpenF1 API is polled every 10 seconds.
-- **Trigger**: A change in `lapNumber` for the leader (or tracked driver) triggers a resolution check.
+## Resolution Timing
+- Questions resolve only on lap completion.
+- OpenF1 remains the source of truth for lap progression and track-status changes.
+- Resolve active questions before evaluating new triggers on the same lap.
 
-## 🏁 Race Status Handling (Safety Cars & Flags)
-Depending on the track status reported by OpenF1:
-
+## Track Status Handling
 | Status | Rule | Action |
 | --- | --- | --- |
-| **GREEN** | Normal | Carry on with question triggering and resolution. |
-| **SC** | Safety Car | **Cancel** questions that haven't reached "LOCK" state. **Pause** questions after "LOCK". |
-| **VSC** | Virtual SC | Same rules as Safety Car. |
-| **RED** | Red Flag | **Immediate cancellation** of ALL active/live questions. |
+| `GREEN` | Normal | Trigger and resolve normally. |
+| `SC` | No new questions | Cancel questions that have not locked; pause locked/active questions. |
+| `VSC` | No new questions | Cancel questions that have not locked; pause locked/active questions. |
+| `RED` | Hard stop | Cancel all active questions immediately. |
 
-## ⏳ Question Lifecycle
-1.  **TRIGGERED**: Logic decides a question is relevant.
-2.  **LIVE**: Question is broadcast to lobbies.
-3.  **LOCKED**: Answer period (20s) has ended. No more answers allowed.
-4.  **RESOLVED**: Data for the resolution lap has arrived. Points are awarded.
-5.  **EXPLAINED**: AI explanation (Claude API) has been sent to the lobby.
-6.  **CLOSED**: Final state.
+## Restart Rule
+- After the track returns to `GREEN`, wait one full lap before triggering another question.
+
+## Question Lifecycle
+1. `TRIGGERED`: backend selected a valid structured prediction moment.
+2. `LIVE`: question is visible and answerable for 20 seconds.
+3. `LOCKED`: answers are closed.
+4. `ACTIVE`: waiting for the lap-window outcome.
+5. `RESOLVED`: deterministic outcome computed from race data.
+6. `EXPLAINED`: explanation shown to clients.
+7. `CLOSED`: question lifecycle complete.
+
+## AI Role In Lifecycle
+- AI can rewrite the question copy after `TRIGGERED`.
+- AI can generate the final explanation after `RESOLVED`.
+- AI never changes lifecycle state or outcome truth.

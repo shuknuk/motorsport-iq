@@ -167,8 +167,8 @@ class SocketClient {
     this.socket?.emit(CLIENT_EVENTS.JOIN_LOBBY, { lobbyCode, username });
   }
 
-  startSession(lobbyId: string, sessionId: string): void {
-    this.socket?.emit(CLIENT_EVENTS.START_SESSION, { lobbyId, sessionId });
+  startSession(lobbyId: string, sessionId: string, userId?: string | null): void {
+    this.socket?.emit(CLIENT_EVENTS.START_SESSION, { lobbyId, sessionId, userId });
   }
 
   submitAnswer(instanceId: string, answer: 'YES' | 'NO'): void {

@@ -4,7 +4,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Lobby, User, QuestionInstance } from '../db/types';
 import supabase from '../db/supabaseClient';
-import type { LobbyState, PlayerState, LeaderboardEntryState, QuestionInstanceState } from '../types';
+import type {
+  LobbyState,
+  PlayerState,
+  LeaderboardEntryState,
+  QuestionInstanceState,
+  SessionMode,
+} from '../types';
 
 /**
  * Lobby Manager - Handle lobby creation, joining, and state management
@@ -13,6 +19,20 @@ import type { LobbyState, PlayerState, LeaderboardEntryState, QuestionInstanceSt
 // In-memory lobby state cache (for fast access)
 const lobbyStates: Map<string, LobbyState> = new Map();
 const userLobbies: Map<string, string> = new Map(); // userId -> lobbyId
+
+interface LobbyRuntimeMeta {
+  sessionMode: SessionMode | null;
+  replaySpeed: number | null;
+  isReplayComplete: boolean;
+}
+
+const defaultRuntimeMeta = (): LobbyRuntimeMeta => ({
+  sessionMode: null,
+  replaySpeed: null,
+  isReplayComplete: false,
+});
+
+const lobbyRuntimeMeta: Map<string, LobbyRuntimeMeta> = new Map();
 
 /**
  * Generate a random 6-character lobby code
@@ -104,6 +124,9 @@ export async function createLobby(username: string, sessionId?: string): Promise
     hostId: user.id,
     sessionId: lobby.session_id,
     status: 'waiting',
+    sessionMode: null,
+    replaySpeed: null,
+    isReplayComplete: false,
     players: [{ id: user.id, username, isHost: true, connected: true }],
     currentQuestion: null,
     questionCount: 0,
@@ -259,6 +282,9 @@ export async function getLobbyState(lobbyId: string): Promise<LobbyState | null>
     hostId: lobby.host_id ?? '',
     sessionId: lobby.session_id,
     status: lobby.status,
+    sessionMode: lobbyRuntimeMeta.get(lobbyId)?.sessionMode ?? null,
+    replaySpeed: lobbyRuntimeMeta.get(lobbyId)?.replaySpeed ?? null,
+    isReplayComplete: lobbyRuntimeMeta.get(lobbyId)?.isReplayComplete ?? false,
     players: (users ?? []).map((u) => ({
       id: u.id,
       username: u.username,
@@ -322,6 +348,25 @@ export async function setLobbySession(lobbyId: string, sessionId: string): Promi
   const lobbyState = lobbyStates.get(lobbyId);
   if (lobbyState) {
     lobbyState.sessionId = sessionId;
+  }
+}
+
+export function setLobbyRuntimeMeta(
+  lobbyId: string,
+  updates: Partial<LobbyRuntimeMeta>
+): void {
+  const next = {
+    ...defaultRuntimeMeta(),
+    ...(lobbyRuntimeMeta.get(lobbyId) ?? {}),
+    ...updates,
+  };
+  lobbyRuntimeMeta.set(lobbyId, next);
+
+  const lobbyState = lobbyStates.get(lobbyId);
+  if (lobbyState) {
+    lobbyState.sessionMode = next.sessionMode;
+    lobbyState.replaySpeed = next.replaySpeed;
+    lobbyState.isReplayComplete = next.isReplayComplete;
   }
 }
 
