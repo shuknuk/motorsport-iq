@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 export type AppTheme = 'f1' | 'swiss';
 
@@ -13,27 +13,42 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = 'msp_theme';
+const THEME_EVENT = 'msp-theme-change';
 
 function applyTheme(theme: AppTheme) {
   document.documentElement.setAttribute('data-theme', theme);
 }
 
-function getInitialTheme(): AppTheme {
+function getStoredTheme(): AppTheme {
   if (typeof window === 'undefined') return 'f1';
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored === 'swiss' ? 'swiss' : 'f1';
+  return localStorage.getItem(STORAGE_KEY) === 'swiss' ? 'swiss' : 'f1';
+}
+
+function subscribe(onStoreChange: () => void) {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const handleChange = () => onStoreChange();
+  window.addEventListener('storage', handleChange);
+  window.addEventListener(THEME_EVENT, handleChange);
+
+  return () => {
+    window.removeEventListener('storage', handleChange);
+    window.removeEventListener(THEME_EVENT, handleChange);
+  };
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<AppTheme>(getInitialTheme);
+  const theme = useSyncExternalStore<AppTheme>(subscribe, getStoredTheme, () => 'f1');
 
-  if (typeof window !== 'undefined') {
+  useEffect(() => {
     applyTheme(theme);
-  }
+  }, [theme]);
 
   const setTheme = useCallback((nextTheme: AppTheme) => {
-    setThemeState(nextTheme);
     localStorage.setItem(STORAGE_KEY, nextTheme);
+    window.dispatchEvent(new Event(THEME_EVENT));
   }, []);
 
   const toggleTheme = useCallback(() => {

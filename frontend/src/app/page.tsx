@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SERVER_EVENTS, type LobbyState } from '@/lib/types';
@@ -85,59 +86,128 @@ export default function Home() {
 
   return (
     <main className="app-shell swiss-noise relative">
-      <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 gap-6 px-4 py-6 md:px-8 lg:grid-cols-12 lg:gap-8 lg:py-10">
-        <section className="swiss-grid-pattern overflow-hidden border-2 border-[var(--color-border)] bg-[var(--color-muted)] px-5 py-8 md:px-8 md:py-10 lg:col-span-7 lg:px-10 lg:py-12">
+      <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 gap-5 px-4 py-4 md:px-8 md:py-6 lg:grid-cols-12 lg:gap-6 lg:py-8">
+        <section className="swiss-grid-pattern relative overflow-hidden border border-[var(--color-border-strong)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-muted),transparent_8%),var(--color-panel))] px-5 py-6 md:px-8 md:py-8 lg:col-span-7 lg:px-10 lg:py-10">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--color-accent)_0_14%,transparent_14%_20%,var(--color-accent)_20%_33%,transparent_33%_38%,var(--color-accent)_38%_65%,transparent_65%_70%,var(--color-accent)_70%_100%)] opacity-90" />
           <div className="mb-8 flex items-start justify-between gap-4">
             <SectionLabel index="01" label="Race Interface" />
             <ThemeToggle />
           </div>
-          <h1 className="font-display text-[clamp(2.6rem,7.2vw,5.25rem)] uppercase leading-[0.9] tracking-tight text-[var(--color-fg)]">
-            Motorsport
-            <span className="ml-2 text-[var(--color-accent)]">IQ</span>
-          </h1>
-          <p className="mt-4 max-w-xl border-l-4 border-[var(--color-accent)] pl-4 font-body text-sm text-[var(--color-muted-fg)] md:text-base">
-            Real-time Formula 1 prediction rounds. 20 seconds per question. Server-authoritative scoring. No guesswork in the state model.
-          </p>
-          <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-            {[
-              { label: 'Round Window', value: '20s' },
-              { label: 'Resolution', value: 'Lap End' },
-              { label: 'Feed', value: 'OpenF1' },
-              { label: 'Transport', value: 'Socket.io' },
-            ].map((item) => (
-              <Card key={item.label} className="p-4" tone="default">
-                <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">{item.label}</p>
-                <p className="mt-2 break-words font-display text-3xl uppercase leading-none md:text-[2.2rem]">{item.value}</p>
-              </Card>
-            ))}
+          <div className="max-w-2xl">
+            <Image
+              src="/logo-motorsport-iq.svg"
+              alt="Motorsport IQ"
+              width={376}
+              height={120}
+              priority
+              className="h-auto w-[min(23rem,78vw)]"
+            />
+            <p className="font-display text-[0.7rem] uppercase tracking-[0.34em] text-[var(--color-muted-fg)]">
+              Live Formula 1 Prediction Companion
+            </p>
+            <p className="mt-5 max-w-xl border-l-[3px] border-[var(--color-accent)] pl-4 font-body text-base leading-7 text-[var(--color-muted-fg)] md:text-lg">
+              Join a private lobby, answer live race prompts in 20 seconds, and climb the board as the session unfolds.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <Card tone="default" className="border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-panel),transparent_6%)] p-5 md:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-display text-xs uppercase tracking-[0.24em] text-[var(--color-muted-fg)]">Session Flow</p>
+                  <h2 className="mt-2 font-display text-3xl uppercase leading-none text-[var(--color-fg)] md:text-[2.5rem]">
+                    Fast In.
+                    <br />
+                    Live All Race.
+                  </h2>
+                </div>
+                <div className="hidden min-w-[88px] border border-[var(--color-border)] px-3 py-2 text-right md:block">
+                  <p className="font-display text-[0.65rem] uppercase tracking-[0.24em] text-[var(--color-muted-fg)]">Window</p>
+                  <p className="mt-1 font-display text-3xl leading-none text-[var(--color-accent)]">20s</p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-3 border-t border-[var(--color-border)] pt-4 md:grid-cols-3">
+                {[
+                  ['Create or join', 'Private lobby access with a driver name and code.'],
+                  ['Answer on the clock', 'Short prediction rounds triggered by live race events.'],
+                  ['Resolve at lap end', 'Leaderboard updates after the race state confirms outcomes.'],
+                ].map(([title, copy]) => (
+                  <div key={title} className="space-y-2">
+                    <p className="font-display text-sm uppercase tracking-[0.16em] text-[var(--color-fg)]">{title}</p>
+                    <p className="text-sm leading-6 text-[var(--color-muted-fg)]">{copy}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <div className="grid gap-4">
+              {[
+                { label: 'Telemetry', value: 'OpenF1 live stream' },
+                { label: 'Format', value: 'Private lobby sessions' },
+                { label: 'Scoring', value: 'Live leaderboard swings' },
+              ].map((item) => (
+                <Card
+                  key={item.label}
+                  className="border-[var(--color-border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-panel),transparent_2%),color-mix(in_srgb,var(--color-muted),transparent_24%))] p-4 md:p-5"
+                  tone="default"
+                >
+                  <p className="font-display text-[0.65rem] uppercase tracking-[0.24em] text-[var(--color-muted-fg)]">{item.label}</p>
+                  <p className="mt-3 max-w-[16ch] font-display text-[1.65rem] uppercase leading-[0.95] text-[var(--color-fg)]">
+                    {item.value}
+                  </p>
+                </Card>
+              ))}
+            </div>
           </div>
         </section>
 
         <section className="lg:col-span-5">
-          <Card tone="default" className="h-full p-6 md:p-8">
-            <SectionLabel index="02" label="Lobby Access" className="mb-6" />
+          <Card
+            tone="default"
+            className="relative h-full overflow-hidden border-[var(--color-border-strong)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-panel),transparent_4%),color-mix(in_srgb,var(--color-muted),transparent_18%))] p-5 md:p-7"
+          >
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--color-accent),transparent)] opacity-70" />
+            <SectionLabel index="02" label="Lobby Access" className="mb-5" />
 
-            <div className="space-y-4">
+            <div className="border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg),transparent_20%)] p-5 md:p-6">
+              <div className="flex items-end justify-between gap-4 border-b border-[var(--color-border)] pb-4">
+                <div>
+                  <p className="font-display text-[0.7rem] uppercase tracking-[0.3em] text-[var(--color-muted-fg)]">
+                    Ready Grid
+                  </p>
+                  <h2 className="mt-2 font-display text-[2.1rem] uppercase leading-none text-[var(--color-fg)]">
+                    Enter Lobby
+                  </h2>
+                </div>
+                <p className="max-w-[12rem] text-right text-xs uppercase tracking-[0.18em] text-[var(--color-muted-fg)]">
+                  Name first. Create new or join with code.
+                </p>
+              </div>
+
+              <div className="mt-5 space-y-4">
               <Input
                 id="username"
                 label="Driver Name"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
-                placeholder="Enter your name"
+                placeholder="Enter your driver name"
                 maxLength={20}
               />
-              <Button onClick={handleCreateLobby} disabled={isLoading && !isJoining} className="w-full">
-                {isLoading && !isJoining ? 'Creating Lobby...' : 'Create Lobby'}
-              </Button>
-            </div>
+                <Button onClick={handleCreateLobby} disabled={isLoading && !isJoining} className="w-full">
+                  {isLoading && !isJoining ? 'Creating Lobby...' : 'Create New Lobby'}
+                </Button>
+              </div>
 
-            <div className="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-              <div className="h-[2px] bg-[var(--color-border)]" />
-              <span className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">OR</span>
-              <div className="h-[2px] bg-[var(--color-border)]" />
-            </div>
+              <div className="my-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="h-px bg-[var(--color-border)]" />
+                <span className="font-display text-[0.7rem] uppercase tracking-[0.28em] text-[var(--color-muted-fg)]">
+                  Or Join Existing
+                </span>
+                <div className="h-px bg-[var(--color-border)]" />
+              </div>
 
-            <div className="space-y-4">
+              <div className="space-y-4">
               <Input
                 id="lobbyCode"
                 label="Lobby Code"
@@ -153,20 +223,35 @@ export default function Home() {
                 disabled={isLoading && isJoining}
                 className="w-full"
               >
-                {isLoading && isJoining ? 'Joining Lobby...' : 'Join Lobby'}
+                {isLoading && isJoining ? 'Joining Lobby...' : 'Join With Code'}
               </Button>
+              </div>
             </div>
 
             {error && (
-              <p className="mt-5 border-2 border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_88%)] p-3 text-sm uppercase tracking-[0.12em] text-[var(--color-fg)]">
+              <p className="mt-4 border border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_90%)] px-4 py-3 text-sm uppercase tracking-[0.12em] text-[var(--color-fg)]">
                 {error}
               </p>
             )}
-
-            <p className="mt-8 border-t-2 border-[var(--color-border)] pt-4 font-display text-xs uppercase tracking-[0.22em] text-[var(--color-muted-fg)]">
-              Powered by OpenF1 telemetry stream
-            </p>
           </Card>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {[
+                ['Private rooms', 'Invite your group and keep the session focused.'],
+                ['Live prompts', 'Questions track the race as the broadcast shifts.'],
+                ['Board updates', 'Standings move when the lap officially resolves.'],
+              ].map(([title, copy]) => (
+                <div key={title} className="border border-[var(--color-border)] px-4 py-4">
+                  <p className="font-display text-[0.68rem] uppercase tracking-[0.24em] text-[var(--color-muted-fg)]">{title}</p>
+                  <p className="mt-3 text-sm leading-6 text-[var(--color-muted-fg)]">{copy}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-5 flex items-center justify-between gap-4 border-t border-[var(--color-border)] pt-4 font-display text-[0.68rem] uppercase tracking-[0.24em] text-[var(--color-muted-fg)]">
+              <span>Powered by OpenF1 telemetry stream</span>
+              <span className="hidden md:inline">Theme toggle available above</span>
+            </p>
         </section>
       </div>
     </main>

@@ -8,6 +8,7 @@
   --color-muted-fg: #9fb0c6;
   --color-accent: #ff1801;
   --color-border: #2a3b55;
+  --color-border-strong: #43597b;
   --radius: 0px;
 }
 
@@ -19,6 +20,7 @@
   --color-muted-fg: #404040;
   --color-accent: #ff3000;
   --color-border: #000000;
+  --color-border-strong: #000000;
   --radius: 0px;
 }
 
@@ -40,7 +42,9 @@ body {
 
 body {
   margin: 0;
-  background: var(--color-bg);
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--color-panel), transparent 12%), transparent 36%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg), transparent 0%), #04070d 100%);
   color: var(--color-fg);
   font-family: var(--font-body), sans-serif;
   transition: background-color 150ms linear, color 150ms linear;
@@ -83,6 +87,12 @@ main {
     linear-gradient(90deg, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
   background-size: 24px 24px;
   mask-image: none;
+}
+
+[data-theme='swiss'] body {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 239, 239, 0.98)),
+    #ffffff;
 }
 
 .swiss-grid-pattern {

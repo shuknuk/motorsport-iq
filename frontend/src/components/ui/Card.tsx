@@ -15,7 +15,7 @@ const toneClasses: Record<CardTone, string> = {
 export default function Card({ className, tone = 'default', ...props }: CardProps) {
   return (
     <div
-      className={cn('border-2 border-[var(--color-border)] p-6 md:p-8', toneClasses[tone], className)}
+      className={cn('border border-[var(--color-border)] p-6 md:p-8', toneClasses[tone], className)}
       {...props}
     />
   );

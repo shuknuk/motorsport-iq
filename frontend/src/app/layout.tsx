@@ -18,6 +18,11 @@ const barlowCondensed = Barlow_Condensed({
 export const metadata: Metadata = {
   title: 'Motorsport IQ',
   description: 'Real-time Formula 1 race prediction game',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

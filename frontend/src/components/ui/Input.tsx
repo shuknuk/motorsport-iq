@@ -15,7 +15,7 @@ export default function Input({ label, className, id, ...props }: InputProps) {
       <input
         id={id}
         className={cn(
-          'h-12 w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 font-body text-sm text-[var(--color-fg)] placeholder:text-[var(--color-muted-fg)]',
+          'h-[3.25rem] w-full border border-[var(--color-border-strong)] bg-[color-mix(in_srgb,var(--color-bg),transparent_8%)] px-4 font-body text-sm text-[var(--color-fg)] placeholder:text-[var(--color-muted-fg)]',
           'transition-colors duration-150 ease-linear focus-visible:outline-none focus-visible:border-[var(--color-accent)]',
           className
         )}

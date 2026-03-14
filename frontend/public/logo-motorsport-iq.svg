@@ -1,0 +1,25 @@
+<svg width="900" height="240" viewBox="0 0 900 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="240" fill="none"/>
+  <g>
+    <rect width="240" height="240" fill="#0B1320"/>
+    <rect x="16" y="16" width="208" height="208" stroke="#43597B" stroke-width="2"/>
+    <path d="M36 44H104L120 68L136 44H204V196H166V100L123 160H116L74 101V196H36V44Z" fill="#F5F7FA"/>
+    <path d="M144 28H224" stroke="#FF1801" stroke-width="8" stroke-linecap="square"/>
+    <path d="M176 178C176 145.415 202.415 119 235 119C267.585 119 294 145.415 294 178C294 210.585 267.585 237 235 237C202.415 237 176 210.585 176 178Z" fill="#FF1801"/>
+    <path d="M235 145C216.222 145 201 160.222 201 179C201 197.778 216.222 213 235 213C243.265 213 250.841 210.048 256.73 205.143L270.5 220L283 207.5L269.247 192.671C271.647 188.591 273 183.84 273 179C273 160.222 257.778 145 239 145H235ZM235 163H239C247.837 163 255 170.163 255 179C255 187.837 247.837 195 239 195C230.163 195 223 187.837 223 179C223 170.163 230.163 163 239 163H235Z" fill="#0B1320"/>
+    <path d="M282 44H334V196H282V44Z" fill="#FF1801"/>
+  </g>
+  <g transform="translate(376 54)">
+    <path d="M0 0H128" stroke="#FF1801" stroke-width="8" stroke-linecap="square"/>
+    <path d="M0 128H494" stroke="#43597B" stroke-width="2"/>
+    <text x="0" y="72" fill="#F5F7FA" font-size="74" font-style="italic" font-weight="700" font-family="'Barlow Condensed', 'Arial Narrow', sans-serif" letter-spacing="1.5">
+      MOTORSPORT
+    </text>
+    <text x="506" y="72" fill="#FF1801" font-size="74" font-style="italic" font-weight="700" font-family="'Barlow Condensed', 'Arial Narrow', sans-serif" letter-spacing="1.5">
+      IQ
+    </text>
+    <text x="0" y="118" fill="#9FB0C6" font-size="20" font-weight="600" font-family="'Barlow Condensed', 'Arial Narrow', sans-serif" letter-spacing="8">
+      LIVE FORMULA 1 PREDICTION COMPANION
+    </text>
+  </g>
+</svg>
