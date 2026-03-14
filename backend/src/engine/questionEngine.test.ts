@@ -156,6 +156,86 @@ describe('questionEngine MVP guardrails', () => {
     expect(selectQuestion(snapshot, previous, lobbyId, null, 10)).toBeNull();
   });
 
+  it('can select a replay question when current lap is below the actual race distance', () => {
+    const snapshot = createSnapshot({
+      sessionMode: 'replay',
+      replaySpeed: 10,
+      lapNumber: 4,
+      totalLaps: 58,
+      drivers: [
+        createDriver({
+          driverNumber: 44,
+          name: 'Leader',
+          team: 'Team L',
+          position: 1,
+          gap: 0,
+          interval: null,
+          tyreAge: 12,
+          drsEnabled: false,
+        }),
+        createDriver({
+          driverNumber: 81,
+          name: 'Driver A',
+          position: 2,
+          gap: 3.2,
+          interval: 0.8,
+          tyreAge: 14,
+          drsEnabled: true,
+        }),
+        createDriver({
+          driverNumber: 16,
+          name: 'Driver B',
+          team: 'Team B',
+          position: 3,
+          gap: 4.0,
+          interval: 0.8,
+          tyreAge: 13,
+          drsEnabled: false,
+        }),
+      ],
+    });
+    const previous = createSnapshot({
+      sessionMode: 'replay',
+      replaySpeed: 10,
+      lapNumber: 3,
+      totalLaps: 58,
+      drivers: [
+        createDriver({
+          driverNumber: 44,
+          name: 'Leader',
+          team: 'Team L',
+          position: 1,
+          gap: 0,
+          interval: null,
+          tyreAge: 11,
+          drsEnabled: false,
+        }),
+        createDriver({
+          driverNumber: 81,
+          name: 'Driver A',
+          position: 2,
+          gap: 3.8,
+          interval: 1.4,
+          tyreAge: 13,
+          drsEnabled: true,
+        }),
+        createDriver({
+          driverNumber: 16,
+          name: 'Driver B',
+          team: 'Team B',
+          position: 3,
+          gap: 5.2,
+          interval: 1.4,
+          tyreAge: 12,
+          drsEnabled: false,
+        }),
+      ],
+    });
+
+    const question = selectQuestion(snapshot, previous, lobbyId, null, 0);
+    expect(question).not.toBeNull();
+  });
+
   it('falls back to deterministic question text when AI is unavailable', async () => {
     const instance: QuestionInstanceState = {
       id: 'instance-1',

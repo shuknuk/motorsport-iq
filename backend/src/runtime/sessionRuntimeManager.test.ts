@@ -114,4 +114,97 @@ describe('SessionRuntimeManager', () => {
     expect(info.isCompleted).toBe(true);
     expect(info.mode).toBe('replay');
   });
+
+  it('initializes replay runtimes with the actual race distance from lap data', async () => {
+    fetchMock.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      const pathname = new URL(url).pathname;
+
+      let payload: unknown = [];
+      if (pathname.endsWith('/drivers')) {
+        payload = [
+          {
+            driver_number: 1,
+            broadcast_name: 'VER',
+            full_name: 'Max Verstappen',
+            name_acronym: 'VER',
+            team_name: 'Red Bull',
+            team_colour: '3671C6',
+            first_name: 'Max',
+            last_name: 'Verstappen',
+            headshot_url: '',
+            country_code: 'NLD',
+            session_key: 1,
+            meeting_key: 1,
+          },
+        ];
+      }
+
+      if (pathname.endsWith('/laps')) {
+        payload = [
+          {
+            session_key: 1,
+            meeting_key: 1,
+            driver_number: 1,
+            lap_number: 58,
+            lap_duration: 90,
+            lap_time: null,
+            is_pit_out_lap: false,
+            date_start: '2024-09-01T13:00:00Z',
+            duration_sector_1: null,
+            duration_sector_2: null,
+            duration_sector_3: null,
+            segments_sector_1: [],
+            segments_sector_2: [],
+            segments_sector_3: [],
+          },
+        ];
+      }
+
+      if (pathname.endsWith('/race_control')) {
+        payload = [
+          {
+            date: '2024-09-01T13:00:00Z',
+            session_key: 1,
+            meeting_key: 1,
+            category: 'SessionStatus',
+            flag: null,
+            scope: null,
+            sector: 0,
+            driver_number: 0,
+            message: 'SESSION STARTED',
+            lap_number: 1,
+          },
+        ];
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => payload,
+      } as Response;
+    });
+
+    const onSnapshotUpdate = jest.fn();
+    const manager = new SessionRuntimeManager({
+      onSnapshotUpdate,
+      onLapComplete: jest.fn(),
+      onFeedStall: jest.fn(),
+      onReplayComplete: jest.fn(),
+      onError: jest.fn(),
+    });
+
+    const runtime = await manager.attachLobbyToSession(
+      'lobby-replay',
+      createSession({ date_end: '2024-09-01T15:00:00Z', session_key: 3003 })
+    );
+
+    jest.runOnlyPendingTimers();
+
+    const snapshot = runtime.getCurrentSnapshot();
+    expect(runtime.mode).toBe('replay');
+    expect(snapshot?.totalLaps).toBe(58);
+
+    runtime.stop();
+  });
 });

@@ -157,6 +157,9 @@ class ReplaySessionRuntime extends BaseRuntime {
     const intervals = await this.client.fetchIntervals();
     const pits = await this.client.fetchPits();
     const raceControl = await this.client.fetchRaceControl();
+    const totalLaps = (laps ?? []).reduce((maxLap, lap) => Math.max(maxLap, lap.lap_number), 0);
+
+    this.snapshotStore.setTotalLaps(totalLaps > 0 ? totalLaps : null);
 
     this.events = buildReplayTimeline({
       laps: laps ?? [],

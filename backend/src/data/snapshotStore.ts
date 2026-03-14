@@ -72,6 +72,15 @@ export class SnapshotStore {
     }
   }
 
+  setTotalLaps(totalLaps: number | null): void {
+    this.totalLaps = totalLaps && totalLaps > 0 ? totalLaps : null;
+
+    if (this.currentSnapshot) {
+      this.currentSnapshot.totalLaps = this.totalLaps;
+      this.options.onSnapshotUpdate?.(this.currentSnapshot);
+    }
+  }
+
   setSessionContext(config: { sessionMode: SessionMode; replaySpeed?: number | null }): void {
     this.sessionMode = config.sessionMode;
     this.replaySpeed = config.replaySpeed ?? null;
@@ -97,7 +106,7 @@ export class SnapshotStore {
 
     if (lap.lap_number > this.lapNumber) {
       this.lapNumber = lap.lap_number;
-      if (this.totalLaps === null || this.lapNumber > this.totalLaps) {
+      if (this.sessionMode === 'live' && (this.totalLaps === null || this.lapNumber > this.totalLaps)) {
         this.totalLaps = this.lapNumber;
       }
     }
