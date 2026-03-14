@@ -30,10 +30,12 @@ function resolveSocketUrl(): string {
 const SOCKET_URL = resolveSocketUrl();
 
 type Listener = (data: unknown) => void;
+type ConnectionError = { message: string };
 
 class SocketClient {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<Listener>> = new Map();
+  private lastError: ConnectionError | null = null;
 
   connect(): Socket {
     if (this.socket?.connected) {
@@ -63,6 +65,7 @@ class SocketClient {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
+      this.lastError = null;
       this.emit('connected', undefined);
     });
 
@@ -71,7 +74,8 @@ class SocketClient {
     });
 
     this.socket.on('connect_error', () => {
-      this.emit('error', { message: 'Connection failed' });
+      this.lastError = { message: 'Connection failed' };
+      this.emit('error', this.lastError);
     });
 
     this.socket.on(SERVER_EVENTS.LOBBY_STATE, (state: LobbyState) => {
@@ -135,6 +139,7 @@ class SocketClient {
     });
 
     this.socket.on(SERVER_EVENTS.ERROR, (error: { message: string }) => {
+      this.lastError = error;
       this.emit(SERVER_EVENTS.ERROR, error);
     });
   }
@@ -193,6 +198,14 @@ class SocketClient {
 
   getSocketId(): string | undefined {
     return this.socket?.id;
+  }
+
+  getResolvedUrl(): string {
+    return SOCKET_URL;
+  }
+
+  getLastError(): ConnectionError | null {
+    return this.lastError;
   }
 }
 

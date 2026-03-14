@@ -126,6 +126,7 @@ export default function LobbyPage() {
 
   const isHost = lobbyState?.hostId === currentUserId;
   const selectedSessionInfo = sessions.find((session) => String(session.session_key) === selectedSession) ?? null;
+  const completedSessions = sessions.filter((session) => session.isCompleted);
 
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -232,36 +233,84 @@ export default function LobbyPage() {
                     <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
                       Race Session
                     </span>
-                    <select
-                      value={selectedSession}
-                      onChange={(event) => setSelectedSession(event.target.value)}
-                      className="h-12 w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 font-display text-sm uppercase focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
-                    >
-                      <option value="">Select Session...</option>
-                      {sessions.map((session) => (
-                        <option
-                          key={session.session_key}
-                          value={session.session_key}
-                          disabled={!session.isCompleted}
-                        >
-                          {session.session_name} - {session.location} ({session.year}) · {session.isCompleted ? 'Replay' : 'Upcoming'}
-                        </option>
-                      ))}
-                    </select>
+                    <p className="font-body text-sm text-[var(--color-muted-fg)]">
+                      Completed sessions launch a 10x telemetry replay. Future sessions stay visible but unavailable until OpenF1 has final race data.
+                    </p>
                   </label>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {sessions.length > 0 ? (
+                    sessions.map((session) => {
+                      const isSelected = String(session.session_key) === selectedSession;
+                      const isCompleted = session.isCompleted;
+
+                      return (
+                        <button
+                          key={session.session_key}
+                          type="button"
+                          disabled={!isCompleted}
+                          onClick={() => isCompleted && setSelectedSession(String(session.session_key))}
+                          className={`w-full border-2 p-4 text-left transition-colors ${
+                            isSelected
+                              ? 'border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_90%)]'
+                              : 'border-[var(--color-border)] bg-[var(--color-bg)]'
+                          } ${
+                            isCompleted
+                              ? 'cursor-pointer hover:border-[var(--color-accent)]'
+                              : 'cursor-not-allowed opacity-55'
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="font-display text-lg uppercase leading-tight">
+                                {session.session_name} · {session.location}
+                              </p>
+                              <p className="mt-1 font-body text-sm text-[var(--color-muted-fg)]">
+                                {session.circuit_short_name}, {session.country_name}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <span className="border-2 border-[var(--color-border)] px-2 py-1 font-display text-[10px] uppercase tracking-[0.18em]">
+                                {session.mode === 'replay' ? 'Replay' : 'Live'}
+                              </span>
+                              <span
+                                className={`border-2 px-2 py-1 font-display text-[10px] uppercase tracking-[0.18em] ${
+                                  isCompleted
+                                    ? 'border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_88%)]'
+                                    : 'border-[var(--color-border)]'
+                                }`}
+                              >
+                                {isCompleted ? 'Replay Ready' : 'Not Completed Yet'}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="mt-3 font-display text-xs uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">
+                            {isCompleted
+                              ? 'Available now. Telemetry replay runs at 10x and triggers AI-written questions from the server question bank.'
+                              : 'Unavailable until the session finishes and OpenF1 historical data is complete.'}
+                          </p>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <p className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-3 font-display text-xs uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">
+                      No race or sprint sessions found for this season.
+                    </p>
+                  )}
                 </div>
 
                 {selectedSessionInfo && (
                   <p className="mt-4 border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-3 font-display text-xs uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">
                     {selectedSessionInfo.isCompleted
-                      ? 'Historical replay starts from race green flag at 10x speed.'
+                      ? 'Historical telemetry replay starts at 10x speed. Questions appear when server-side race signals match the curated question bank, then Groq/Llama rewrites the prompt and explanation.'
                       : 'This session has not completed yet and cannot be started.'}
                   </p>
                 )}
 
-                {sessions.length === 0 && (
-                  <p className="mt-4 border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-3 font-display text-xs uppercase tracking-[0.14em] text-[var(--color-muted-fg)]">
-                    No race or sprint sessions found for this season.
+                {sessions.length > 0 && completedSessions.length === 0 && (
+                  <p className="mt-4 border-2 border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_92%)] p-3 font-display text-xs uppercase tracking-[0.14em]">
+                    No completed sessions are available for this year yet.
                   </p>
                 )}
 

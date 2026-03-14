@@ -168,6 +168,11 @@ export default function GamePage() {
                 </span>
               )}
             </div>
+            <p className="mt-3 max-w-3xl font-body text-sm text-[var(--color-muted-fg)]">
+              {lobbyState.sessionMode === 'replay'
+                ? 'This session is running from OpenF1 historical telemetry at 10x speed. The server watches the replay for question-bank triggers, then Groq/Llama rewrites the prompt and explains each resolution.'
+                : 'This session follows live telemetry. Questions appear only when the server-side trigger engine finds a valid race situation.'}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
             <ThemeToggle />
@@ -224,7 +229,7 @@ export default function GamePage() {
                   {lobbyState.isReplayComplete
                     ? 'Replay finished. Final leaderboard is locked in.'
                     : lobbyState.sessionMode === 'replay'
-                      ? 'Next trigger arrives from accelerated historical telemetry.'
+                      ? 'Next trigger arrives from accelerated historical telemetry, not broadcast video.'
                       : 'Next trigger arrives from live race telemetry.'}
                 </p>
                 <p className="mt-4 font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
