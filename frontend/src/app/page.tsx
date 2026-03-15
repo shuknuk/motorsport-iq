@@ -1,10 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SERVER_EVENTS, type LobbyState } from '@/lib/types';
+import { SERVER_EVENTS, type LobbyState, type SessionInfo } from '@/lib/types';
 import { getSocketClient } from '@/lib/socket';
+import { deriveHomeOpenF1Status } from '@/lib/homeStatus';
 import { Button, Card, Input, SectionLabel, ThemeToggle } from '@/components/ui';
 
 export default function Home() {
@@ -17,6 +18,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [statusYear] = useState<number>(() => new Date().getFullYear());
+  const [isStatusLoading, setIsStatusLoading] = useState(true);
+  const [statusFetchError, setStatusFetchError] = useState(false);
 
   useEffect(() => {
     const socket = getSocketClient();
@@ -39,7 +44,16 @@ export default function Home() {
 
         router.push(`/game/${state.code}`);
       }),
+      socket.on(SERVER_EVENTS.SESSIONS_LIST, (sessionList: SessionInfo[]) => {
+        setSessions(sessionList);
+        setIsStatusLoading(false);
+        setStatusFetchError(false);
+      }),
       socket.on(SERVER_EVENTS.ERROR, ({ message }: { message: string }) => {
+        if (message.toLowerCase().includes('sessions')) {
+          setStatusFetchError(true);
+          setIsStatusLoading(false);
+        }
         setError(message);
         setIsLoading(false);
         setIsJoining(false);
@@ -50,6 +64,23 @@ export default function Home() {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [router, username]);
+
+  useEffect(() => {
+    const socket = getSocketClient();
+    socket.connect();
+    socket.getSessions(statusYear);
+  }, [statusYear]);
+
+  const homeStatus = useMemo(
+    () =>
+      deriveHomeOpenF1Status({
+        sessions,
+        isLoading: isStatusLoading,
+        hasError: statusFetchError,
+        year: statusYear,
+      }),
+    [sessions, isStatusLoading, statusFetchError, statusYear]
+  );
 
   const handleCreateLobby = () => {
     if (!username.trim()) {
@@ -143,9 +174,16 @@ export default function Home() {
 
             <div className="grid gap-4">
               {[
-                { label: 'Telemetry', value: 'OpenF1 live stream' },
-                { label: 'Format', value: 'Private lobby sessions' },
-                { label: 'Scoring', value: 'Live leaderboard swings' },
+                { label: 'Track Status', value: homeStatus.trackStatusText },
+                { label: 'Session Progress', value: homeStatus.progressText },
+                {
+                  label: 'Leader Proxy (Session)',
+                  value: homeStatus.sessionPrimary,
+                },
+                {
+                  label: 'Top-3 Proxy (Session)',
+                  value: homeStatus.sessionSecondary,
+                },
               ].map((item) => (
                 <Card
                   key={item.label}
