@@ -80,7 +80,7 @@ describe('SessionRuntimeManager', () => {
     ).toBe('live');
   });
 
-  it('reuses a runtime for the same session and isolates different sessions', async () => {
+  it('creates isolated replay runtimes per lobby while reusing live runtimes per session', async () => {
     const manager = new SessionRuntimeManager({
       onSnapshotUpdate: jest.fn(),
       onLapComplete: jest.fn(),
@@ -99,13 +99,26 @@ describe('SessionRuntimeManager', () => {
         session_key: 3002,
       })
     );
+    const liveRuntimeAgain = await manager.attachLobbyToSession(
+      'lobby-d',
+      createSession({
+        date_end: '2099-09-01T15:00:00Z',
+        session_key: 3002,
+      })
+    );
 
-    expect(replayRuntimeA).toBe(replayRuntimeB);
+    expect(replayRuntimeA).not.toBe(replayRuntimeB);
     expect(replayRuntimeA).not.toBe(liveRuntime);
     expect(replayRuntimeA.mode).toBe('replay');
     expect(liveRuntime.mode).toBe('live');
+    expect(liveRuntime).toBe(liveRuntimeAgain);
+    expect(manager.getRuntimeForLobby('lobby-a')).toBe(replayRuntimeA);
+    expect(manager.getRuntimeForLobby('lobby-b')).toBe(replayRuntimeB);
+    expect(manager.getRuntimeForLobby('lobby-c')).toBe(liveRuntime);
+    expect(manager.getRuntime('3002')).toBe(liveRuntime);
 
     replayRuntimeA.stop();
+    replayRuntimeB.stop();
     liveRuntime.stop();
   });
 

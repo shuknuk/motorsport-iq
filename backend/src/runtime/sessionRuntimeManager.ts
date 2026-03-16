@@ -146,6 +146,9 @@ class ReplaySessionRuntime extends BaseRuntime {
   async start(): Promise<void> {
     if (this.started) return;
     this.started = true;
+    this.events = [];
+    this.currentIndex = 0;
+    this.complete = false;
     this.client.setSession(this.session.session_key);
     await this.snapshotStore.initialize(this.session.session_key, {
       sessionMode: 'replay',
@@ -231,6 +234,7 @@ class ReplaySessionRuntime extends BaseRuntime {
 
 export class SessionRuntimeManager {
   private runtimes = new Map<string, SessionRuntime>();
+  private lobbyRuntimeKeys = new Map<string, string>();
   private readonly callbacks: RuntimeCallbacks;
 
   constructor(callbacks: RuntimeCallbacks) {
@@ -242,34 +246,57 @@ export class SessionRuntimeManager {
     return endDate < Date.now() ? 'replay' : 'live';
   }
 
+  private getRuntimeKey(lobbyId: string, session: OpenF1Session): string {
+    const mode = this.getSessionMode(session);
+    if (mode === 'replay') {
+      return `replay:${lobbyId}:${session.session_key}`;
+    }
+
+    return `live:${session.session_key}`;
+  }
+
   async attachLobbyToSession(lobbyId: string, session: OpenF1Session): Promise<SessionRuntime> {
-    const sessionId = String(session.session_key);
-    let runtime = this.runtimes.get(sessionId);
+    const runtimeKey = this.getRuntimeKey(lobbyId, session);
+    let runtime = this.runtimes.get(runtimeKey);
     if (!runtime) {
       const mode = this.getSessionMode(session);
       runtime = mode === 'replay'
         ? new ReplaySessionRuntime(session, this.callbacks)
         : new LiveSessionRuntime(session, this.callbacks);
-      this.runtimes.set(sessionId, runtime);
+      this.runtimes.set(runtimeKey, runtime);
     }
 
     runtime.addLobby(lobbyId);
+    this.lobbyRuntimeKeys.set(lobbyId, runtimeKey);
     await runtime.start();
     return runtime;
   }
 
-  detachLobbyFromSession(lobbyId: string, sessionId: string): void {
-    const runtime = this.runtimes.get(sessionId);
+  detachLobbyFromSession(lobbyId: string): void {
+    const runtimeKey = this.lobbyRuntimeKeys.get(lobbyId);
+    if (!runtimeKey) return;
+
+    const runtime = this.runtimes.get(runtimeKey);
     if (!runtime) return;
 
     runtime.removeLobby(lobbyId);
     if (runtime.getLobbyIds().size === 0) {
-      this.runtimes.delete(sessionId);
+      this.runtimes.delete(runtimeKey);
     }
+    this.lobbyRuntimeKeys.delete(lobbyId);
   }
 
   getRuntime(sessionId: string): SessionRuntime | null {
-    return this.runtimes.get(sessionId) ?? null;
+    return this.runtimes.get(`live:${sessionId}`) ?? null;
+  }
+
+  getRuntimeForLobby(lobbyId: string): SessionRuntime | null {
+    const runtimeKey = this.lobbyRuntimeKeys.get(lobbyId);
+    if (!runtimeKey) {
+      return null;
+    }
+
+    return this.runtimes.get(runtimeKey) ?? null;
   }
 }
 

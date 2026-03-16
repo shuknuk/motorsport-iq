@@ -253,7 +253,7 @@ async function checkAndTriggerQuestion(lobbyId: string, snapshot: RaceSnapshot):
   }
 
   // Try to select a new question
-  const previousSnapshot = runtimeManager.getRuntime(snapshot.sessionId)?.getPreviousSnapshot() ?? null;
+  const previousSnapshot = runtimeManager.getRuntimeForLobby(lobbyId)?.getPreviousSnapshot() ?? null;
   const newQuestion = selectQuestion(
     snapshot,
     previousSnapshot,
@@ -554,7 +554,7 @@ io.on('connection', (socket) => {
       socket.emit('lobby_state', lobbyState);
 
       if (lobbyState.sessionId) {
-        const snapshot = runtimeManager.getRuntime(lobbyState.sessionId)?.getCurrentSnapshot();
+        const snapshot = runtimeManager.getRuntimeForLobby(lobbyId)?.getCurrentSnapshot();
         if (snapshot) {
           socket.emit('race_snapshot_update', {
             sessionId: snapshot.sessionId,
