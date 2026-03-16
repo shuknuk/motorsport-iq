@@ -12,6 +12,7 @@ export type ProblemReportReason =
   | 'TELEMETRY_MISMATCH'
   | 'OTHER';
 export type ProblemReportStatus = 'OPEN' | 'REVIEWED' | 'RESOLVED' | 'DISMISSED';
+export type PresenceExpiryReason = 'inactive' | 'disconnected_timeout';
 
 export interface PlayerState {
   id: string;
@@ -197,6 +198,7 @@ export const SERVER_EVENTS = {
   ANSWER_RECEIVED: 'answer_received',
   SESSIONS_LIST: 'sessions_list',
   FEED_STATUS: 'feed_status',
+  PRESENCE_EXPIRED: 'presence_expired',
   ERROR: 'error',
 } as const;
 
@@ -208,4 +210,5 @@ export const CLIENT_EVENTS = {
   RECONNECT_LOBBY: 'reconnect_lobby',
   GET_SESSIONS: 'get_sessions',
   LEAVE_LOBBY: 'leave_lobby',
+  PRESENCE_PING: 'presence_ping',
 } as const;

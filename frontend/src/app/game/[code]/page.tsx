@@ -116,6 +116,10 @@ export default function GamePage() {
       socket.on(SERVER_EVENTS.ERROR, ({ message }: { message: string }) => {
         setError(message);
       }),
+      socket.on(SERVER_EVENTS.PRESENCE_EXPIRED, () => {
+        localStorage.removeItem('msp_user_id');
+        router.push('/');
+      }),
     ];
 
     const userId = localStorage.getItem('msp_user_id');
@@ -126,7 +130,23 @@ export default function GamePage() {
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, []);
+  }, [router]);
+
+  useEffect(() => {
+    if (!currentUserId) {
+      return;
+    }
+
+    const socket = getSocketClient();
+    socket.sendPresencePing();
+    const interval = window.setInterval(() => {
+      socket.sendPresencePing();
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [currentUserId]);
 
   const handleSubmitAnswer = useCallback(
     (selectedAnswer: 'YES' | 'NO') => {
@@ -187,6 +207,12 @@ export default function GamePage() {
     }
   };
 
+  const handleLeaveSession = useCallback(() => {
+    localStorage.removeItem('msp_user_id');
+    getSocketClient().leaveLobby();
+    router.push('/');
+  }, [router]);
+
   if (!lobbyState) {
     return (
       <main className="app-shell flex items-center justify-center">
@@ -245,7 +271,7 @@ export default function GamePage() {
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
             <ThemeToggle />
-            <Button variant="ghost" onClick={() => router.push('/')}>
+            <Button variant="ghost" onClick={handleLeaveSession}>
               Leave Session
             </Button>
           </div>

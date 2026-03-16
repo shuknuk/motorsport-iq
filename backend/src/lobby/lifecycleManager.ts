@@ -35,12 +35,46 @@ const TRIGGER_TO_LIVE_MS = 1000; // 1 second between trigger and live
 // Active timers tracking
 const questionTimers: Map<string, NodeJS.Timeout> = new Map();
 const answerDeadlines: Map<string, Date> = new Map();
+const lobbyTimers: Map<string, Set<NodeJS.Timeout>> = new Map();
 
 // Active questions by lobby
 const activeQuestions: Map<string, QuestionInstanceState> = new Map();
 
 // Paused questions (SC/VSC)
 const pausedQuestions: Map<string, QuestionInstanceState> = new Map();
+
+function trackLobbyTimer(lobbyId: string, timer: NodeJS.Timeout): void {
+  const timers = lobbyTimers.get(lobbyId) ?? new Set<NodeJS.Timeout>();
+  timers.add(timer);
+  lobbyTimers.set(lobbyId, timers);
+}
+
+function untrackLobbyTimer(lobbyId: string, timer: NodeJS.Timeout): void {
+  const timers = lobbyTimers.get(lobbyId);
+  if (!timers) return;
+  timers.delete(timer);
+  if (timers.size === 0) {
+    lobbyTimers.delete(lobbyId);
+  }
+}
+
+function clearTrackedTimer(lobbyId: string, timer: NodeJS.Timeout): void {
+  clearTimeout(timer);
+  untrackLobbyTimer(lobbyId, timer);
+}
+
+function scheduleLobbyTimer(
+  lobbyId: string,
+  callback: () => Promise<void> | void,
+  delayMs: number
+): NodeJS.Timeout {
+  const timer = setTimeout(async () => {
+    untrackLobbyTimer(lobbyId, timer);
+    await callback();
+  }, delayMs);
+  trackLobbyTimer(lobbyId, timer);
+  return timer;
+}
 
 /**
  * Create a new question instance in database
@@ -119,7 +153,7 @@ export async function startQuestionLifecycle(
   await incrementQuestionCount(instance.lobbyId);
 
   // TRIGGERED -> LIVE (after brief delay)
-  setTimeout(async () => {
+  scheduleLobbyTimer(instance.lobbyId, async () => {
     if (instance.state !== 'TRIGGERED') return;
 
     instance.state = 'LIVE';
@@ -131,7 +165,7 @@ export async function startQuestionLifecycle(
     answerDeadlines.set(instance.id, deadline);
 
     // LIVE -> LOCKED (after answer window)
-    const timer = setTimeout(async () => {
+    const timer = scheduleLobbyTimer(instance.lobbyId, async () => {
       await transitionToLocked(instance, onStateChange, onResolution);
     }, ANSWER_WINDOW_MS);
 
@@ -148,6 +182,7 @@ async function transitionToLocked(
   onResolution: (result: { instance: QuestionInstanceState; outcome: boolean; correctAnswer: 'YES' | 'NO'; explanation: string }) => void
 ): Promise<void> {
   if (instance.state !== 'LIVE') return;
+  questionTimers.delete(instance.id);
 
   instance.state = 'LOCKED';
   await updateQuestionState(instance.id, 'LOCKED');
@@ -206,7 +241,7 @@ async function pauseQuestion(
   // Clear any active timer
   const timer = questionTimers.get(instance.id);
   if (timer) {
-    clearTimeout(timer);
+    clearTrackedTimer(instance.lobbyId, timer);
     questionTimers.delete(instance.id);
   }
 
@@ -320,7 +355,7 @@ async function resolveQuestionInstance(
   await processAnswers(instance, result.correctAnswer);
 
   // RESOLVED -> EXPLAINED -> CLOSED (after delay)
-  setTimeout(async () => {
+  scheduleLobbyTimer(instance.lobbyId, async () => {
     instance.state = 'EXPLAINED';
     await updateQuestionState(instance.id, 'EXPLAINED');
     onStateChange({ ...instance });
@@ -334,7 +369,7 @@ async function resolveQuestionInstance(
     });
 
     // EXPLAINED -> CLOSED
-    setTimeout(async () => {
+    scheduleLobbyTimer(instance.lobbyId, async () => {
       instance.state = 'CLOSED';
       await updateQuestionState(instance.id, 'CLOSED');
       onStateChange({ ...instance });
@@ -456,6 +491,33 @@ export function getActiveQuestion(lobbyId: string): QuestionInstanceState | null
   return activeQuestions.get(lobbyId) ?? null;
 }
 
+export function clearLobbyLifecycle(lobbyId: string): void {
+  const activeInstance = activeQuestions.get(lobbyId);
+  const pausedInstance = pausedQuestions.get(lobbyId);
+  const timers = lobbyTimers.get(lobbyId);
+
+  if (timers) {
+    for (const timer of timers) {
+      clearTimeout(timer);
+    }
+    lobbyTimers.delete(lobbyId);
+  }
+
+  for (const instance of [activeInstance, pausedInstance]) {
+    if (!instance) continue;
+    const timer = questionTimers.get(instance.id);
+    if (timer) {
+      clearTrackedTimer(lobbyId, timer);
+      questionTimers.delete(instance.id);
+    }
+    answerDeadlines.delete(instance.id);
+  }
+
+  activeQuestions.delete(lobbyId);
+  pausedQuestions.delete(lobbyId);
+  setCurrentQuestion(lobbyId, null);
+}
+
 /**
  * Get answer deadline for a question
  */
@@ -505,9 +567,12 @@ export async function getQuestionStateForReconnect(
  * Clear all timers (cleanup on shutdown)
  */
 export function clearAllTimers(): void {
-  for (const timer of questionTimers.values()) {
-    clearTimeout(timer);
+  for (const timers of lobbyTimers.values()) {
+    for (const timer of timers) {
+      clearTimeout(timer);
+    }
   }
+  lobbyTimers.clear();
   questionTimers.clear();
   answerDeadlines.clear();
   activeQuestions.clear();

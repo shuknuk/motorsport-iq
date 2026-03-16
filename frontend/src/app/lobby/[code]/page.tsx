@@ -83,6 +83,10 @@ export default function LobbyPage() {
         setError(message);
         setIsStarting(false);
       }),
+      socket.on(SERVER_EVENTS.PRESENCE_EXPIRED, () => {
+        localStorage.removeItem('msp_user_id');
+        router.push('/');
+      }),
     ];
 
     socket.getSessions(selectedYear);
@@ -97,11 +101,33 @@ export default function LobbyPage() {
     };
   }, [lobbyCode, router, selectedYear]);
 
+  useEffect(() => {
+    if (!currentUserId) {
+      return;
+    }
+
+    const socket = getSocketClient();
+    socket.sendPresencePing();
+    const interval = window.setInterval(() => {
+      socket.sendPresencePing();
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [currentUserId]);
+
   const handleCopyCode = useCallback(() => {
     navigator.clipboard.writeText(lobbyCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [lobbyCode]);
+
+  const handleLeaveLobby = useCallback(() => {
+    localStorage.removeItem('msp_user_id');
+    getSocketClient().leaveLobby();
+    router.push('/');
+  }, [router]);
 
   const handleStartGame = useCallback(() => {
     if (!lobbyState || !selectedSession) {
@@ -170,7 +196,7 @@ export default function LobbyPage() {
             <Button variant="secondary" onClick={handleCopyCode}>
               {copied ? 'Code Copied' : 'Copy Code'}
             </Button>
-            <Button variant="ghost" onClick={() => router.push('/')}>
+            <Button variant="ghost" onClick={handleLeaveLobby}>
               Leave Lobby
             </Button>
           </div>

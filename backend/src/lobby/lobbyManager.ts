@@ -35,6 +35,14 @@ const defaultRuntimeMeta = (): LobbyRuntimeMeta => ({
 
 const lobbyRuntimeMeta: Map<string, LobbyRuntimeMeta> = new Map();
 
+export interface RemovePlayerResult {
+  lobbyId: string;
+  lobbyCode: string;
+  lobbyDeleted: boolean;
+  nextHostId: string | null;
+  remainingPlayerIds: string[];
+}
+
 /**
  * Generate a random 6-character lobby code
  */
@@ -373,6 +381,17 @@ export function setLobbyRuntimeMeta(
   }
 }
 
+export function clearLobbyRuntimeMeta(lobbyId: string): void {
+  lobbyRuntimeMeta.delete(lobbyId);
+}
+
+export async function touchUserActivity(userId: string): Promise<void> {
+  await supabase
+    .from('users')
+    .update({ last_active_at: new Date().toISOString() })
+    .eq('id', userId);
+}
+
 /**
  * Increment question count
  */
@@ -428,21 +447,62 @@ export function updatePlayerConnection(userId: string, connected: boolean): void
 /**
  * Remove player from lobby
  */
-export async function removePlayer(userId: string): Promise<void> {
+export async function removePlayer(userId: string): Promise<RemovePlayerResult | null> {
   const lobbyId = userLobbies.get(userId);
-  if (!lobbyId) return;
+  if (!lobbyId) return null;
+
+  const lobbyState = await getLobbyState(lobbyId);
+  if (!lobbyState) {
+    userLobbies.delete(userId);
+    return null;
+  }
+
+  const remainingPlayers = lobbyState.players.filter((player) => player.id !== userId);
+  const nextHostId = lobbyState.hostId === userId
+    ? remainingPlayers[0]?.id ?? null
+    : lobbyState.hostId;
 
   // Delete from database
   await supabase.from('users').delete().eq('id', userId);
 
+  if (remainingPlayers.length === 0) {
+    await supabase.from('lobbies').delete().eq('id', lobbyId);
+  } else if (nextHostId !== lobbyState.hostId) {
+    await supabase.from('lobbies').update({ host_id: nextHostId }).eq('id', lobbyId);
+  }
+
   // Update cache
-  const lobbyState = lobbyStates.get(lobbyId);
-  if (lobbyState) {
-    lobbyState.players = lobbyState.players.filter((p) => p.id !== userId);
-    lobbyState.leaderboard = lobbyState.leaderboard.filter((lb) => lb.userId !== userId);
+  const cachedLobbyState = lobbyStates.get(lobbyId);
+  if (cachedLobbyState) {
+    cachedLobbyState.players = remainingPlayers.map((player) => ({
+      ...player,
+      isHost: player.id === nextHostId,
+    }));
+    cachedLobbyState.leaderboard = cachedLobbyState.leaderboard.filter((lb) => lb.userId !== userId);
+    cachedLobbyState.hostId = nextHostId ?? '';
   }
 
   userLobbies.delete(userId);
+
+  if (remainingPlayers.length === 0) {
+    clearLobbyRuntimeMeta(lobbyId);
+    clearLobbyCache(lobbyId);
+    return {
+      lobbyId,
+      lobbyCode: lobbyState.code,
+      lobbyDeleted: true,
+      nextHostId: null,
+      remainingPlayerIds: [],
+    };
+  }
+
+  return {
+    lobbyId,
+    lobbyCode: lobbyState.code,
+    lobbyDeleted: false,
+    nextHostId,
+    remainingPlayerIds: remainingPlayers.map((player) => player.id),
+  };
 }
 
 /**

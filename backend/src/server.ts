@@ -16,6 +16,7 @@ import {
   updatePlayerConnection,
   removePlayer,
   getUserLobby,
+  touchUserActivity,
 } from './lobby/lobbyManager';
 import {
   startQuestionLifecycle,
@@ -24,11 +25,13 @@ import {
   checkForResolution,
   resumeQuestion,
   clearAllTimers,
+  clearLobbyLifecycle,
 } from './lobby/lifecycleManager';
 import { generateQuestionText } from './ai/explanationGenerator';
 import { OpenF1Client } from './data/openf1Client';
 import { selectQuestion, clearCooldowns } from './engine/questionEngine';
 import { SessionRuntimeManager, toSessionInfo } from './runtime/sessionRuntimeManager';
+import { PresenceManager, type PresenceExpiryReason } from './lobby/presenceManager';
 import {
   clearAdminSessionCookie,
   requireAdminSession,
@@ -233,6 +236,51 @@ const runtimeManager = new SessionRuntimeManager({
   },
 });
 
+async function handleUserRemoval(
+  userId: string,
+  reason: PresenceExpiryReason | 'left',
+  socketId?: string | null
+): Promise<void> {
+  const removal = await removePlayer(userId);
+  if (!removal) {
+    return;
+  }
+
+  presenceManager.removeUser(userId);
+
+  if (reason !== 'left' && socketId) {
+    const targetSocket = io.sockets.sockets.get(socketId);
+    if (targetSocket) {
+      targetSocket.emit('presence_expired', { reason });
+      targetSocket.disconnect(true);
+    }
+  }
+
+  if (removal.lobbyDeleted) {
+    clearCooldowns(removal.lobbyId);
+    clearLobbyLifecycle(removal.lobbyId);
+    runtimeManager.detachLobbyFromSession(removal.lobbyId);
+    return;
+  }
+
+  io.to(removal.lobbyId).emit('player_left', { userId });
+  const nextState = await getLobbyState(removal.lobbyId);
+  if (nextState) {
+    io.to(removal.lobbyId).emit('lobby_state', nextState);
+  }
+}
+
+const presenceManager = new PresenceManager({
+  onExpire: async (entry, reason) => {
+    await handleUserRemoval(entry.userId, reason, entry.socketId);
+  },
+});
+
+async function markUserActive(userId: string): Promise<void> {
+  presenceManager.markSeen(userId);
+  await touchUserActivity(userId);
+}
+
 /**
  * Check and trigger a new question for a lobby
  */
@@ -411,6 +459,8 @@ io.on('connection', (socket) => {
       currentLobbyId = lobby.id;
 
       socket.join(lobby.id);
+      presenceManager.upsertConnection({ userId: user.id, lobbyId: lobby.id, socketId: socket.id });
+      await touchUserActivity(user.id);
 
       const lobbyState = await getLobbyState(lobby.id);
       socket.emit('lobby_state', lobbyState);
@@ -431,6 +481,8 @@ io.on('connection', (socket) => {
       currentLobbyId = lobby.id;
 
       socket.join(lobby.id);
+      presenceManager.upsertConnection({ userId: user.id, lobbyId: lobby.id, socketId: socket.id });
+      await touchUserActivity(user.id);
 
       const lobbyState = await getLobbyState(lobby.id);
       socket.emit('lobby_state', lobbyState);
@@ -464,6 +516,7 @@ io.on('connection', (socket) => {
 
       currentUserId = actingUserId;
       currentLobbyId = data.lobbyId;
+      await markUserActive(actingUserId);
 
       const session = await sessionLookupClient.getSession(parseInt(data.sessionId, 10));
       if (!session) {
@@ -517,6 +570,8 @@ io.on('connection', (socket) => {
         throw new Error('Not authenticated');
       }
 
+      await markUserActive(currentUserId);
+
       const result = await submitAnswer(data.instanceId, currentUserId, data.answer);
 
       if (result.success) {
@@ -549,9 +604,15 @@ io.on('connection', (socket) => {
 
       socket.join(lobbyId);
       updatePlayerConnection(data.userId, true);
+      presenceManager.upsertConnection({ userId: data.userId, lobbyId, socketId: socket.id });
+      await touchUserActivity(data.userId);
 
       // Send current state
-      socket.emit('lobby_state', lobbyState);
+      const refreshedLobbyState = await getLobbyState(lobbyId);
+      socket.emit('lobby_state', refreshedLobbyState ?? lobbyState);
+      if (refreshedLobbyState) {
+        io.to(lobbyId).emit('lobby_state', refreshedLobbyState);
+      }
 
       if (lobbyState.sessionId) {
         const snapshot = runtimeManager.getRuntimeForLobby(lobbyId)?.getCurrentSnapshot();
@@ -595,6 +656,14 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('presence_ping', async () => {
+    if (!currentUserId) {
+      return;
+    }
+
+    await markUserActive(currentUserId);
+  });
+
   /**
    * Get available sessions
    */
@@ -620,9 +689,14 @@ io.on('connection', (socket) => {
   socket.on('disconnect', async () => {
     console.log(`Client disconnected: ${socket.id}`);
 
-    if (currentUserId && currentLobbyId) {
+    const disconnectedPresence = presenceManager.markDisconnectedBySocket(socket.id);
+    if (currentUserId && currentLobbyId && disconnectedPresence) {
       updatePlayerConnection(currentUserId, false);
       socket.to(currentLobbyId).emit('player_disconnected', { userId: currentUserId });
+      const nextState = await getLobbyState(currentLobbyId);
+      if (nextState) {
+        io.to(currentLobbyId).emit('lobby_state', nextState);
+      }
     }
   });
 
@@ -631,9 +705,8 @@ io.on('connection', (socket) => {
    */
   socket.on('leave_lobby', async () => {
     if (currentUserId && currentLobbyId) {
-      await removePlayer(currentUserId);
       socket.leave(currentLobbyId);
-      socket.to(currentLobbyId).emit('player_left', { userId: currentUserId });
+      await handleUserRemoval(currentUserId, 'left');
       currentUserId = null;
       currentLobbyId = null;
     }
@@ -643,6 +716,7 @@ io.on('connection', (socket) => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
+  presenceManager.stop();
   clearAllTimers();
   httpServer.close(() => {
     console.log('Server closed');
@@ -652,6 +726,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully...');
+  presenceManager.stop();
   clearAllTimers();
   httpServer.close(() => {
     console.log('Server closed');

@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { resolveBackendUrl } from './backendUrl';
 import type {
   LobbyState,
+  PresenceExpiryReason,
   QuestionEvent,
   ResolutionEvent,
   LeaderboardEntry,
@@ -123,6 +124,10 @@ class SocketClient {
       this.emit(SERVER_EVENTS.FEED_STATUS, data);
     });
 
+    this.socket.on(SERVER_EVENTS.PRESENCE_EXPIRED, (data: { reason: PresenceExpiryReason }) => {
+      this.emit(SERVER_EVENTS.PRESENCE_EXPIRED, data);
+    });
+
     this.socket.on(SERVER_EVENTS.ERROR, (error: { message: string }) => {
       this.lastError = error;
       this.emit(SERVER_EVENTS.ERROR, error);
@@ -175,6 +180,10 @@ class SocketClient {
 
   leaveLobby(): void {
     this.socket?.emit(CLIENT_EVENTS.LEAVE_LOBBY);
+  }
+
+  sendPresencePing(): void {
+    this.socket?.emit(CLIENT_EVENTS.PRESENCE_PING);
   }
 
   isConnected(): boolean {

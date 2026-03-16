@@ -122,6 +122,28 @@ describe('SessionRuntimeManager', () => {
     liveRuntime.stop();
   });
 
+  it('removes replay runtimes when the owning lobby detaches', async () => {
+    const manager = new SessionRuntimeManager({
+      onSnapshotUpdate: jest.fn(),
+      onLapComplete: jest.fn(),
+      onFeedStall: jest.fn(),
+      onReplayComplete: jest.fn(),
+      onError: jest.fn(),
+    });
+
+    const replaySession = createSession({ date_end: '2024-09-01T15:00:00Z', session_key: 3004 });
+    const replayRuntime = await manager.attachLobbyToSession('lobby-a', replaySession);
+
+    manager.detachLobbyFromSession('lobby-a');
+
+    expect(manager.getRuntimeForLobby('lobby-a')).toBeNull();
+
+    const replayRuntimeAgain = await manager.attachLobbyToSession('lobby-a', replaySession);
+    expect(replayRuntimeAgain).not.toBe(replayRuntime);
+
+    replayRuntimeAgain.stop();
+  });
+
   it('adds derived session info for the picker', () => {
     const info = toSessionInfo(createSession({ date_end: '2024-09-01T15:00:00Z' }));
     expect(info.isCompleted).toBe(true);

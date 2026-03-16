@@ -239,6 +239,8 @@ export interface PlayerState {
   connected: boolean;
 }
 
+export type PresenceExpiryReason = 'inactive' | 'disconnected_timeout';
+
 export interface LeaderboardEntryState {
   userId: string;
   username: string;
