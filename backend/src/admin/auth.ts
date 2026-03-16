@@ -80,10 +80,11 @@ function parseCookies(header: string | undefined): Record<string, string> {
 }
 
 function getCookieSettings() {
+  const isProduction = process.env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: isProduction ? ('none' as const) : ('lax' as const),
+    secure: isProduction, // Required when sameSite is 'none'
     path: '/',
     maxAge: ADMIN_SESSION_DURATION_MS,
   };
