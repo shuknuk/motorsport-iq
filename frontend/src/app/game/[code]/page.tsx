@@ -6,15 +6,26 @@ import QuestionCard from '@/components/QuestionCard';
 import CountdownTimer from '@/components/CountdownTimer';
 import Leaderboard from '@/components/Leaderboard';
 import { getSocketClient } from '@/lib/socket';
+import { apiFetch } from '@/lib/api';
 import {
   SERVER_EVENTS,
+  type CreateProblemReportInput,
   type LeaderboardEntry,
   type LobbyState,
+  type ProblemReportReason,
   type QuestionEvent,
   type RaceSnapshotEvent,
   type ResolutionEvent,
 } from '@/lib/types';
 import { Button, Card, SectionLabel, ThemeToggle } from '@/components/ui';
+
+const REPORT_REASON_OPTIONS: Array<{ value: ProblemReportReason; label: string }> = [
+  { value: 'WRONG_ANSWER', label: 'Wrong Answer' },
+  { value: 'BAD_EXPLANATION', label: 'Bad Explanation' },
+  { value: 'UNCLEAR_QUESTION', label: 'Unclear Question' },
+  { value: 'TELEMETRY_MISMATCH', label: 'Telemetry Mismatch' },
+  { value: 'OTHER', label: 'Other' },
+];
 
 export default function GamePage() {
   const params = useParams();
@@ -30,6 +41,12 @@ export default function GamePage() {
   const [raceSnapshot, setRaceSnapshot] = useState<RaceSnapshotEvent | null>(null);
   const [feedStalled, setFeedStalled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState<ProblemReportReason>('WRONG_ANSWER');
+  const [reportNote, setReportNote] = useState('');
+  const [isReportFormOpen, setIsReportFormOpen] = useState(false);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
 
@@ -41,12 +58,22 @@ export default function GamePage() {
       socket.on(SERVER_EVENTS.LOBBY_STATE, (state: LobbyState) => {
         setLobbyState(state);
         setLeaderboard(state.leaderboard);
+        if (state.latestResolution && !state.currentQuestion) {
+          setResolution(state.latestResolution);
+          setQuestionState('RESOLVED');
+        }
       }),
       socket.on(SERVER_EVENTS.QUESTION_EVENT, (event: QuestionEvent) => {
         setCurrentQuestion(event);
         setQuestionState('LIVE');
         setAnswer(null);
         setResolution(null);
+        setIsReportFormOpen(false);
+        setIsSubmittingReport(false);
+        setReportSuccess(false);
+        setReportError(null);
+        setReportNote('');
+        setReportReason('WRONG_ANSWER');
       }),
       socket.on(
         SERVER_EVENTS.QUESTION_STATE,
@@ -70,6 +97,12 @@ export default function GamePage() {
         setResolution(event);
         setQuestionState('RESOLVED');
         setCurrentQuestion(null);
+        setIsReportFormOpen(false);
+        setIsSubmittingReport(false);
+        setReportSuccess(false);
+        setReportError(null);
+        setReportNote('');
+        setReportReason('WRONG_ANSWER');
       }),
       socket.on(SERVER_EVENTS.LEADERBOARD_UPDATE, (entries: LeaderboardEntry[]) => {
         setLeaderboard(entries);
@@ -104,6 +137,42 @@ export default function GamePage() {
     },
     [answer, currentQuestion]
   );
+
+  const handleSubmitReport = useCallback(async () => {
+    if (!resolution || !currentUserId || isSubmittingReport) {
+      return;
+    }
+
+    setIsSubmittingReport(true);
+    setReportError(null);
+
+    try {
+      const payload: CreateProblemReportInput = {
+        instanceId: resolution.instanceId,
+        userId: currentUserId,
+        reason: reportReason,
+        note: reportNote,
+      };
+
+      const response = await apiFetch('/reports', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      const data = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        throw new Error(data.message ?? 'Failed to submit report');
+      }
+
+      setReportSuccess(true);
+      setIsReportFormOpen(false);
+      setReportNote('');
+    } catch (submissionError) {
+      setReportError((submissionError as Error).message);
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  }, [currentUserId, isSubmittingReport, reportNote, reportReason, resolution]);
 
   const getTrackStatusLabel = (status: string) => {
     switch (status) {
@@ -218,6 +287,79 @@ export default function GamePage() {
                 <div className="mt-5 border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-4">
                   <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Explanation</p>
                   <p className="mt-2 font-body text-sm leading-relaxed">{resolution.explanation}</p>
+                </div>
+                <div className="mt-5 border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Problem Reporting</p>
+                      <p className="mt-2 font-body text-sm text-[var(--color-muted-fg)]">
+                        If the AI resolved this question incorrectly, send it to the admin review queue.
+                      </p>
+                    </div>
+                    <Button
+                      variant={reportSuccess ? 'secondary' : 'primary'}
+                      size="sm"
+                      disabled={reportSuccess}
+                      onClick={() => setIsReportFormOpen((current) => !current)}
+                    >
+                      {reportSuccess ? 'Reported' : isReportFormOpen ? 'Close Report' : 'Report a Problem'}
+                    </Button>
+                  </div>
+
+                  {isReportFormOpen && !reportSuccess && (
+                    <div className="mt-4 grid gap-4 border-t-2 border-[var(--color-border)] pt-4">
+                      <label className="block">
+                        <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                          Reason
+                        </span>
+                        <select
+                          value={reportReason}
+                          onChange={(event) => setReportReason(event.target.value as ProblemReportReason)}
+                          className="h-12 w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 font-display text-sm uppercase focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
+                        >
+                          {REPORT_REASON_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                          Optional Note
+                        </span>
+                        <textarea
+                          value={reportNote}
+                          onChange={(event) => setReportNote(event.target.value)}
+                          rows={4}
+                          placeholder="Add the telemetry detail or answer mismatch you think is wrong."
+                          className="w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 font-body text-sm text-[var(--color-fg)] placeholder:text-[var(--color-muted-fg)] focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
+                        />
+                      </label>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="font-body text-xs text-[var(--color-muted-fg)]">
+                          One report per player per question. Re-submitting updates your previous report.
+                        </p>
+                        <Button size="sm" onClick={handleSubmitReport} disabled={isSubmittingReport}>
+                          {isSubmittingReport ? 'Submitting…' : 'Send Report'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {reportSuccess && (
+                    <p className="mt-4 font-display text-xs uppercase tracking-[0.16em] text-[var(--color-accent)]">
+                      Report submitted to admin review.
+                    </p>
+                  )}
+
+                  {reportError && (
+                    <p className="mt-4 font-display text-xs uppercase tracking-[0.16em] text-[var(--color-accent)]">
+                      {reportError}
+                    </p>
+                  )}
                 </div>
               </Card>
             )}

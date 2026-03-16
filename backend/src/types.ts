@@ -20,6 +20,13 @@ export interface DriverState {
 // Track status types
 export type TrackStatus = 'GREEN' | 'SC' | 'VSC' | 'RED';
 export type SessionMode = 'live' | 'replay';
+export type ProblemReportReason =
+  | 'WRONG_ANSWER'
+  | 'BAD_EXPLANATION'
+  | 'UNCLEAR_QUESTION'
+  | 'TELEMETRY_MISMATCH'
+  | 'OTHER';
+export type ProblemReportStatus = 'OPEN' | 'REVIEWED' | 'RESOLVED' | 'DISMISSED';
 
 // Race snapshot built on each lap completion
 export interface RaceSnapshot {
@@ -220,6 +227,7 @@ export interface LobbyState {
   isReplayComplete: boolean;
   players: PlayerState[];
   currentQuestion: QuestionInstanceState | null;
+  latestResolution: ResolutionEvent | null;
   questionCount: number;
   leaderboard: LeaderboardEntryState[];
 }
@@ -274,7 +282,34 @@ export interface ResolutionEvent {
   correctAnswer: 'YES' | 'NO';
   outcome: boolean;
   explanation: string;
-  scores: ScoreUpdate[];
+  scores?: ScoreUpdate[];
+}
+
+export interface CreateProblemReportInput {
+  instanceId: string;
+  userId: string;
+  reason: ProblemReportReason;
+  note?: string;
+}
+
+export interface AdminProblemReport {
+  id: string;
+  instanceId: string;
+  userId: string;
+  username: string;
+  lobbyId: string;
+  lobbyCode: string;
+  questionId: string;
+  questionText: string | null;
+  correctAnswer: 'YES' | 'NO' | null;
+  explanation: string | null;
+  reportedAnswer: 'YES' | 'NO' | null;
+  reason: ProblemReportReason;
+  note: string | null;
+  status: ProblemReportStatus;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt: string | null;
 }
 
 export interface ScoreUpdate {

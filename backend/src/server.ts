@@ -4,7 +4,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import supabase from './db/supabaseClient';
-import type { QuestionInstanceState, RaceSnapshot } from './types';
+import type { CreateProblemReportInput, ProblemReportStatus, QuestionInstanceState, RaceSnapshot } from './types';
 import {
   createLobby,
   joinLobby,
@@ -12,6 +12,7 @@ import {
   updateLobbyStatus,
   setLobbySession,
   setLobbyRuntimeMeta,
+  setLatestResolution,
   updatePlayerConnection,
   removePlayer,
   getUserLobby,
@@ -28,20 +29,35 @@ import { generateQuestionText } from './ai/explanationGenerator';
 import { OpenF1Client } from './data/openf1Client';
 import { selectQuestion, clearCooldowns } from './engine/questionEngine';
 import { SessionRuntimeManager, toSessionInfo } from './runtime/sessionRuntimeManager';
+import {
+  clearAdminSessionCookie,
+  requireAdminSession,
+  setAdminSessionCookie,
+  updateAdminPassword,
+  validateAdminPassword,
+} from './admin/auth';
+import {
+  createOrUpdateProblemReport,
+  isProblemReportStatus,
+  listProblemReports,
+  updateProblemReportStatus,
+} from './admin/reporting';
 
 const app = express();
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PATCH'],
+  credentials: true,
+};
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-  },
+  cors: corsOptions,
 });
 
 const PORT = process.env.PORT || 4000;
 
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Health check
@@ -74,6 +90,100 @@ app.get('/health/supabase', async (req, res) => {
     res.json({ status: 'connected', timestamp: new Date().toISOString() });
   } catch (err) {
     res.status(500).json({ status: 'error', error: (err as Error).message });
+  }
+});
+
+app.post('/reports', async (req, res) => {
+  try {
+    const { instanceId, userId, reason, note } = req.body as CreateProblemReportInput;
+    if (!instanceId || !userId || !reason) {
+      res.status(400).json({ message: 'instanceId, userId, and reason are required' });
+      return;
+    }
+
+    const result = await createOrUpdateProblemReport({ instanceId, userId, reason, note });
+    res.json({ success: true, id: result.id });
+  } catch (error) {
+    res.status(400).json({ message: (error as Error).message });
+  }
+});
+
+app.post('/admin/login', async (req, res) => {
+  try {
+    const password = String(req.body?.password ?? '');
+    if (!password) {
+      res.status(400).json({ message: 'Password is required' });
+      return;
+    }
+
+    const isValid = await validateAdminPassword(password);
+    if (!isValid) {
+      res.status(401).json({ message: 'Incorrect password' });
+      return;
+    }
+
+    setAdminSessionCookie(res);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: (error as Error).message });
+  }
+});
+
+app.post('/admin/logout', requireAdminSession, async (req, res) => {
+  clearAdminSessionCookie(res);
+  res.json({ success: true });
+});
+
+app.post('/admin/change-password', requireAdminSession, async (req, res) => {
+  try {
+    const currentPassword = String(req.body?.currentPassword ?? '');
+    const nextPassword = String(req.body?.newPassword ?? '');
+
+    if (!currentPassword || !nextPassword) {
+      res.status(400).json({ message: 'Current and new password are required' });
+      return;
+    }
+
+    if (nextPassword.length < 10) {
+      res.status(400).json({ message: 'New password must be at least 10 characters' });
+      return;
+    }
+
+    await updateAdminPassword(currentPassword, nextPassword);
+    clearAdminSessionCookie(res);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ message: (error as Error).message });
+  }
+});
+
+app.get('/admin/reports', requireAdminSession, async (req, res) => {
+  try {
+    const reports = await listProblemReports();
+    res.json({ reports });
+  } catch (error) {
+    res.status(500).json({ message: (error as Error).message });
+  }
+});
+
+app.patch('/admin/reports/:id', requireAdminSession, async (req, res) => {
+  try {
+    const status = String(req.body?.status ?? '') as ProblemReportStatus;
+    const reportId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!isProblemReportStatus(status)) {
+      res.status(400).json({ message: 'Invalid report status' });
+      return;
+    }
+
+    if (!reportId) {
+      res.status(400).json({ message: 'Report id is required' });
+      return;
+    }
+
+    await updateProblemReportStatus(reportId, status);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ message: (error as Error).message });
   }
 });
 
@@ -154,6 +264,7 @@ async function checkAndTriggerQuestion(lobbyId: string, snapshot: RaceSnapshot):
 
   if (newQuestion) {
     newQuestion.questionText = await generateQuestionText(newQuestion);
+    setLatestResolution(lobbyId, null);
     console.log(`Triggering question ${newQuestion.questionId} for lobby ${lobbyId}`);
 
     // Broadcast question event
@@ -227,16 +338,18 @@ async function handleResolution(
 ): Promise<void> {
   // Get updated leaderboard
   const lobbyState = await getLobbyState(lobbyId);
-
-  // Broadcast resolution
-  io.to(lobbyId).emit('resolution_event', {
+  const resolutionPayload = {
     instanceId: result.instance.id,
     questionId: result.instance.questionId,
-    questionText: result.instance.questionText,
+    questionText: result.instance.questionText ?? '',
     correctAnswer: result.correctAnswer,
     outcome: result.outcome,
     explanation: result.explanation,
-  });
+  };
+  setLatestResolution(lobbyId, resolutionPayload);
+
+  // Broadcast resolution
+  io.to(lobbyId).emit('resolution_event', resolutionPayload);
 
   // Broadcast updated leaderboard
   if (lobbyState) {
@@ -363,6 +476,7 @@ io.on('connection', (socket) => {
       // Update lobby status
       await updateLobbyStatus(data.lobbyId, 'active');
       await setLobbySession(data.lobbyId, data.sessionId);
+      setLatestResolution(data.lobbyId, null);
 
       const runtime = await runtimeManager.attachLobbyToSession(data.lobbyId, session);
       setLobbyRuntimeMeta(data.lobbyId, {
@@ -471,6 +585,10 @@ io.on('connection', (socket) => {
         });
       }
 
+      if (lobbyState.latestResolution) {
+        socket.emit('resolution_event', lobbyState.latestResolution);
+      }
+
       console.log(`User ${data.userId} reconnected to lobby ${lobbyId}`);
     } catch (error) {
       socket.emit('error', { message: (error as Error).message });
@@ -487,7 +605,7 @@ io.on('connection', (socket) => {
       const supportedSessions = (sessions ?? [])
         .filter((session) => ['Race', 'Sprint'].includes(session.session_name))
         .sort(
-          (a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime()
+          (a, b) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime()
         )
         .map((session) => toSessionInfo(session));
       socket.emit('sessions_list', supportedSessions);

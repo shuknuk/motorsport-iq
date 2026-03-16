@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS question_instances (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     lobby_id UUID REFERENCES lobbies(id) ON DELETE CASCADE,
     question_id VARCHAR(50) NOT NULL, -- Reference to question bank ID
+    question_text TEXT,
     state VARCHAR(20) DEFAULT 'TRIGGERED', -- TRIGGERED, LIVE, LOCKED, ACTIVE, RESOLVED, EXPLAINED, CLOSED
     triggered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     locked_at TIMESTAMP WITH TIME ZONE,
@@ -71,6 +72,33 @@ CREATE TABLE IF NOT EXISTS answers (
     UNIQUE(instance_id, user_id) -- One answer per user per question
 );
 
+-- Admin credentials (single-row table)
+CREATE TABLE IF NOT EXISTS admin_credentials (
+    id VARCHAR(50) PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Player problem reports
+CREATE TABLE IF NOT EXISTS problem_reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    instance_id UUID REFERENCES question_instances(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    lobby_id UUID REFERENCES lobbies(id) ON DELETE CASCADE,
+    question_id VARCHAR(50) NOT NULL,
+    question_text_snapshot TEXT,
+    correct_answer_snapshot VARCHAR(3),
+    explanation_snapshot TEXT,
+    reported_answer_snapshot VARCHAR(3),
+    reason VARCHAR(50) NOT NULL,
+    note TEXT,
+    status VARCHAR(20) DEFAULT 'OPEN',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE(instance_id, user_id)
+);
+
 -- Leaderboard table (cached scores per lobby)
 CREATE TABLE IF NOT EXISTS leaderboard (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -93,6 +121,8 @@ CREATE INDEX IF NOT EXISTS idx_question_instances_lobby_id ON question_instances
 CREATE INDEX IF NOT EXISTS idx_question_instances_state ON question_instances(state);
 CREATE INDEX IF NOT EXISTS idx_answers_instance_id ON answers(instance_id);
 CREATE INDEX IF NOT EXISTS idx_answers_user_id ON answers(user_id);
+CREATE INDEX IF NOT EXISTS idx_problem_reports_status ON problem_reports(status);
+CREATE INDEX IF NOT EXISTS idx_problem_reports_created_at ON problem_reports(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_lobby_id ON leaderboard(lobby_id);
 CREATE INDEX IF NOT EXISTS idx_lobbies_code ON lobbies(code);
 CREATE INDEX IF NOT EXISTS idx_lobbies_status ON lobbies(status);
@@ -147,6 +177,8 @@ ALTER TABLE lobbies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE question_instances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_credentials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE problem_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leaderboard ENABLE ROW LEVEL SECURITY;
 
 -- Public read policies (for anonymous users in lobbies)
@@ -155,6 +187,8 @@ CREATE POLICY "Anyone can read users" ON users FOR SELECT USING (true);
 CREATE POLICY "Anyone can read question instances" ON question_instances FOR SELECT USING (true);
 CREATE POLICY "Anyone can read answers" ON answers FOR SELECT USING (true);
 CREATE POLICY "Anyone can read leaderboard" ON leaderboard FOR SELECT USING (true);
+CREATE POLICY "Anyone can insert problem reports" ON problem_reports FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anyone can update problem reports" ON problem_reports FOR UPDATE USING (true);
 
 -- Insert policies (server-side with service role)
 -- These are permissive for MVP; tighten for production

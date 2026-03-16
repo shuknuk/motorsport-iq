@@ -78,6 +78,7 @@ export interface Database {
           id: string;
           lobby_id: string;
           question_id: string;
+          question_text: string | null;
           state: QuestionState;
           triggered_at: string;
           locked_at: string | null;
@@ -95,6 +96,7 @@ export interface Database {
           id?: string;
           lobby_id: string;
           question_id: string;
+          question_text?: string | null;
           state?: QuestionState;
           triggered_at?: string;
           locked_at?: string | null;
@@ -112,6 +114,7 @@ export interface Database {
           id?: string;
           lobby_id?: string;
           question_id?: string;
+          question_text?: string | null;
           state?: QuestionState;
           triggered_at?: string;
           locked_at?: string | null;
@@ -150,6 +153,76 @@ export interface Database {
           answer?: 'YES' | 'NO';
           submitted_at?: string;
           response_time_ms?: number | null;
+        };
+      };
+      admin_credentials: {
+        Row: {
+          id: string;
+          password_hash: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          password_hash: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          password_hash?: string;
+          updated_at?: string;
+        };
+      };
+      problem_reports: {
+        Row: {
+          id: string;
+          instance_id: string;
+          user_id: string;
+          lobby_id: string;
+          question_id: string;
+          question_text_snapshot: string | null;
+          correct_answer_snapshot: 'YES' | 'NO' | null;
+          explanation_snapshot: string | null;
+          reported_answer_snapshot: 'YES' | 'NO' | null;
+          reason: ProblemReportReason;
+          note: string | null;
+          status: ProblemReportStatus;
+          created_at: string;
+          updated_at: string;
+          reviewed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          instance_id: string;
+          user_id: string;
+          lobby_id: string;
+          question_id: string;
+          question_text_snapshot?: string | null;
+          correct_answer_snapshot?: 'YES' | 'NO' | null;
+          explanation_snapshot?: string | null;
+          reported_answer_snapshot?: 'YES' | 'NO' | null;
+          reason: ProblemReportReason;
+          note?: string | null;
+          status?: ProblemReportStatus;
+          created_at?: string;
+          updated_at?: string;
+          reviewed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          instance_id?: string;
+          user_id?: string;
+          lobby_id?: string;
+          question_id?: string;
+          question_text_snapshot?: string | null;
+          correct_answer_snapshot?: 'YES' | 'NO' | null;
+          explanation_snapshot?: string | null;
+          reported_answer_snapshot?: 'YES' | 'NO' | null;
+          reason?: ProblemReportReason;
+          note?: string | null;
+          status?: ProblemReportStatus;
+          created_at?: string;
+          updated_at?: string;
+          reviewed_at?: string | null;
         };
       };
       leaderboard: {
@@ -218,8 +291,23 @@ export type QuestionState =
   | 'CLOSED'
   | 'CANCELLED';
 
+export type ProblemReportReason =
+  | 'WRONG_ANSWER'
+  | 'BAD_EXPLANATION'
+  | 'UNCLEAR_QUESTION'
+  | 'TELEMETRY_MISMATCH'
+  | 'OTHER';
+
+export type ProblemReportStatus =
+  | 'OPEN'
+  | 'REVIEWED'
+  | 'RESOLVED'
+  | 'DISMISSED';
+
 export type Lobby = Database['public']['Tables']['lobbies']['Row'];
 export type User = Database['public']['Tables']['users']['Row'];
 export type QuestionInstance = Database['public']['Tables']['question_instances']['Row'];
 export type Answer = Database['public']['Tables']['answers']['Row'];
+export type AdminCredential = Database['public']['Tables']['admin_credentials']['Row'];
+export type ProblemReport = Database['public']['Tables']['problem_reports']['Row'];
 export type LeaderboardEntry = Database['public']['Tables']['leaderboard']['Row'];

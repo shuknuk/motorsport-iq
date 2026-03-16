@@ -1,6 +1,7 @@
 'use client';
 
 import { io, Socket } from 'socket.io-client';
+import { resolveBackendUrl } from './backendUrl';
 import type {
   LobbyState,
   QuestionEvent,
@@ -11,23 +12,7 @@ import type {
 } from './types';
 import { SERVER_EVENTS, CLIENT_EVENTS } from './types';
 
-function resolveSocketUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
-  if (configuredUrl) return configuredUrl;
-
-  if (typeof window === 'undefined') {
-    return 'http://localhost:4000';
-  }
-
-  // Local dev expects backend on :4000, deployed builds should default to same-origin.
-  if (window.location.hostname === 'localhost') {
-    return 'http://localhost:4000';
-  }
-
-  return window.location.origin;
-}
-
-const SOCKET_URL = resolveSocketUrl();
+const SOCKET_URL = resolveBackendUrl();
 
 type Listener = (data: unknown) => void;
 type ConnectionError = { message: string };

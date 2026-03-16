@@ -5,6 +5,13 @@ export type SessionMode = 'live' | 'replay';
 export type QuestionCategory = 'OVERTAKE' | 'PIT_WINDOW' | 'GAP_CLOSING' | 'FINISH_POSITION';
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type QuestionState = 'TRIGGERED' | 'LIVE' | 'LOCKED' | 'ACTIVE' | 'RESOLVED' | 'EXPLAINED' | 'CLOSED' | 'CANCELLED';
+export type ProblemReportReason =
+  | 'WRONG_ANSWER'
+  | 'BAD_EXPLANATION'
+  | 'UNCLEAR_QUESTION'
+  | 'TELEMETRY_MISMATCH'
+  | 'OTHER';
+export type ProblemReportStatus = 'OPEN' | 'REVIEWED' | 'RESOLVED' | 'DISMISSED';
 
 export interface PlayerState {
   id: string;
@@ -82,6 +89,7 @@ export interface LobbyState {
   isReplayComplete: boolean;
   players: PlayerState[];
   currentQuestion: QuestionInstanceState | null;
+  latestResolution: ResolutionEvent | null;
   questionCount: number;
   leaderboard: LeaderboardEntry[];
 }
@@ -105,6 +113,33 @@ export interface ResolutionEvent {
   outcome: boolean;
   explanation: string;
   scores?: ScoreUpdate[];
+}
+
+export interface CreateProblemReportInput {
+  instanceId: string;
+  userId: string;
+  reason: ProblemReportReason;
+  note?: string;
+}
+
+export interface AdminProblemReport {
+  id: string;
+  instanceId: string;
+  userId: string;
+  username: string;
+  lobbyId: string;
+  lobbyCode: string;
+  questionId: string;
+  questionText: string | null;
+  correctAnswer: 'YES' | 'NO' | null;
+  explanation: string | null;
+  reportedAnswer: 'YES' | 'NO' | null;
+  reason: ProblemReportReason;
+  note: string | null;
+  status: ProblemReportStatus;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt: string | null;
 }
 
 export interface ScoreUpdate {

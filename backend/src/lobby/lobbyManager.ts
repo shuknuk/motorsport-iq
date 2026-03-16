@@ -10,6 +10,7 @@ import type {
   LeaderboardEntryState,
   QuestionInstanceState,
   SessionMode,
+  ResolutionEvent,
 } from '../types';
 
 /**
@@ -129,6 +130,7 @@ export async function createLobby(username: string, sessionId?: string): Promise
     isReplayComplete: false,
     players: [{ id: user.id, username, isHost: true, connected: true }],
     currentQuestion: null,
+    latestResolution: null,
     questionCount: 0,
     leaderboard: [],
   };
@@ -292,6 +294,7 @@ export async function getLobbyState(lobbyId: string): Promise<LobbyState | null>
       connected: true, // Assume connected on initial load
     })),
     currentQuestion: null, // Would need to fetch active question
+    latestResolution: null,
     questionCount: lobby.question_count,
     leaderboard: (leaderboard ?? []).map((lb) => ({
       userId: lb.user_id,
@@ -396,6 +399,13 @@ export function setCurrentQuestion(lobbyId: string, question: QuestionInstanceSt
   const lobbyState = lobbyStates.get(lobbyId);
   if (lobbyState) {
     lobbyState.currentQuestion = question;
+  }
+}
+
+export function setLatestResolution(lobbyId: string, resolution: ResolutionEvent | null): void {
+  const lobbyState = lobbyStates.get(lobbyId);
+  if (lobbyState) {
+    lobbyState.latestResolution = resolution;
   }
 }
 
