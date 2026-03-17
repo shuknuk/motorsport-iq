@@ -19,6 +19,8 @@ export default function LobbyPage() {
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
 
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
 
@@ -27,6 +29,20 @@ export default function LobbyPage() {
     socket.connect();
 
     const unsubscribers = [
+      socket.on('connected', () => {
+        setIsReconnecting(false);
+        setConnectionNotice(null);
+        if (currentUserId) {
+          socket.reconnectLobby(currentUserId);
+        }
+      }),
+      socket.on('disconnected', () => {
+        setIsReconnecting(true);
+      }),
+      socket.on('connection_error', ({ message }: { message: string }) => {
+        setIsReconnecting(true);
+        setConnectionNotice(message);
+      }),
       socket.on(SERVER_EVENTS.LOBBY_STATE, (state: LobbyState) => {
         setLobbyState(state);
         setIsLoading(false);
@@ -99,7 +115,7 @@ export default function LobbyPage() {
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [lobbyCode, router, selectedYear]);
+  }, [currentUserId, lobbyCode, router, selectedYear]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -190,6 +206,11 @@ export default function LobbyPage() {
             <p className="mt-2 font-body text-sm text-[var(--color-muted-fg)]">
               Host controls race session. Players receive synchronized state updates on reconnect.
             </p>
+            {(isReconnecting || connectionNotice) && (
+              <p className="mt-3 border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 font-display text-[11px] uppercase tracking-[0.14em]">
+                {connectionNotice ?? 'Reconnecting to live race server…'}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
             <ThemeToggle />

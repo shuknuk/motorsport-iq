@@ -55,7 +55,7 @@ describe('PresenceManager', () => {
     manager.stop();
   });
 
-  it('expires disconnected users after the grace period', async () => {
+  it('retains disconnected users after grace expiry and only expires them on inactivity timeout', async () => {
     const onExpire = jest.fn();
     const manager = new PresenceManager({
       inactivityTimeoutMs: 60_000,
@@ -68,7 +68,9 @@ describe('PresenceManager', () => {
     manager.markDisconnectedBySocket('socket-1');
 
     await jest.advanceTimersByTimeAsync(5_000);
+    expect(onExpire).not.toHaveBeenCalled();
 
+    await jest.advanceTimersByTimeAsync(55_000);
     expect(onExpire).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-1',
@@ -76,7 +78,7 @@ describe('PresenceManager', () => {
         socketId: null,
         connected: false,
       }),
-      'disconnected_timeout'
+      'inactive'
     );
 
     manager.stop();

@@ -18,6 +18,7 @@ import {
   type LobbyState,
   type ProblemReportReason,
   type QuestionEvent,
+  type QuestionState,
   type RaceSnapshotEvent,
   type ResolutionEvent,
   type StatHintKey,
@@ -55,8 +56,47 @@ export default function GamePage() {
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState<boolean>(() => getSocketClient().isConnected());
+  const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
 
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
+  const hydrateQuestionFromLobby = useEffectEvent((state: LobbyState) => {
+    const question = state.currentQuestion;
+    if (!question) {
+      setCurrentQuestion(null);
+      setSuggestedStatKeys([]);
+      return;
+    }
+
+    setCurrentQuestion((previous) => {
+      const fallbackCategory = previous?.instanceId === question.id ? previous.category : 'GAP_CLOSING';
+      const fallbackDifficulty = previous?.instanceId === question.id ? previous.difficulty : 'MEDIUM';
+      const triggeredAt = typeof question.triggeredAt === 'string'
+        ? question.triggeredAt
+        : new Date(question.triggeredAt).toISOString();
+
+      return {
+        instanceId: question.id,
+        questionId: question.questionId,
+        questionText: question.questionText ?? previous?.questionText ?? 'Question in progress',
+        category: fallbackCategory,
+        difficulty: fallbackDifficulty,
+        windowSize: question.windowSize,
+        triggeredAt,
+        answerDeadline: new Date(new Date(triggeredAt).getTime() + 20_000).toISOString(),
+        state: question.state,
+        suggestedStatKeys: question.suggestedStatKeys ?? previous?.suggestedStatKeys ?? [],
+      };
+    });
+
+    setQuestionState(question.state);
+    setSuggestedStatKeys(question.suggestedStatKeys ?? []);
+    setResolution(null);
+    if (question.state !== 'LIVE') {
+      setIsProcessingAnswer(false);
+    }
+  });
+
   const handleSocketError = useEffectEvent(({ message }: { message: string }) => {
     if (isProcessingAnswer && currentQuestion) {
       setSubmittedAnswers((current) => {
@@ -74,17 +114,39 @@ export default function GamePage() {
     socket.connect();
 
     const unsubscribers = [
+      socket.on('connected', () => {
+        setIsSocketConnected(true);
+        setConnectionNotice(null);
+        if (currentUserId) {
+          socket.reconnectLobby(currentUserId);
+        }
+      }),
+      socket.on('disconnected', () => {
+        setIsSocketConnected(false);
+        setConnectionNotice('Connection lost. Reconnecting to live race server…');
+        setIsProcessingAnswer(false);
+      }),
+      socket.on('connection_error', ({ message }: { message: string }) => {
+        setIsSocketConnected(false);
+        setConnectionNotice(message);
+        setIsProcessingAnswer(false);
+      }),
       socket.on(SERVER_EVENTS.LOBBY_STATE, (state: LobbyState) => {
         setLobbyState(state);
         setLeaderboard(state.leaderboard);
-        if (state.latestResolution && !state.currentQuestion) {
+        if (state.currentQuestion) {
+          hydrateQuestionFromLobby(state);
+          return;
+        }
+
+        if (state.latestResolution) {
           setResolution(state.latestResolution);
           setQuestionState('RESOLVED');
         }
       }),
       socket.on(SERVER_EVENTS.QUESTION_EVENT, (event: QuestionEvent) => {
         setCurrentQuestion(event);
-        setQuestionState('LIVE');
+        setQuestionState(event.state ?? 'LIVE');
         setResolution(null);
         setIsProcessingAnswer(false);
         setSuggestedStatKeys(event.suggestedStatKeys ?? []);
@@ -97,8 +159,11 @@ export default function GamePage() {
       }),
       socket.on(
         SERVER_EVENTS.QUESTION_STATE,
-        (data: { instanceId: string; state: string; cancelledReason?: string }) => {
+        (data: { instanceId: string; state: QuestionState; cancelledReason?: string }) => {
           setQuestionState(data.state);
+          if (data.state !== 'LIVE') {
+            setIsProcessingAnswer(false);
+          }
           if (data.state === 'CANCELLED') {
             setCurrentQuestion(null);
           }
@@ -156,7 +221,7 @@ export default function GamePage() {
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [handleSocketError, router]);
+  }, [currentUserId, handleSocketError, hydrateQuestionFromLobby, router]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -190,7 +255,7 @@ export default function GamePage() {
 
   const handleSubmitAnswer = useCallback(
     (selectedAnswer: 'YES' | 'NO') => {
-      if (!currentQuestion || submittedAnswers[currentQuestion.instanceId]) return;
+      if (!currentQuestion || submittedAnswers[currentQuestion.instanceId] || isProcessingAnswer) return;
 
       getSocketClient().submitAnswer(currentQuestion.instanceId, selectedAnswer);
       setSubmittedAnswers((current) => ({
@@ -199,7 +264,7 @@ export default function GamePage() {
       }));
       setIsProcessingAnswer(true);
     },
-    [currentQuestion, submittedAnswers]
+    [currentQuestion, isProcessingAnswer, submittedAnswers]
   );
 
   const handleSubmitReport = useCallback(async () => {
@@ -254,6 +319,9 @@ export default function GamePage() {
   const tireStatsHighlighted = suggestedStatKeys.some((key) => (
     key === 'TYRE_COMPOUND' || key === 'TYRE_AGE' || key === 'STINT_NUMBER'
   ));
+  const showQuestionWaitingState = Boolean(
+    currentQuestion && ['TRIGGERED', 'LOCKED', 'ACTIVE'].includes(questionState ?? '')
+  );
 
   if (!lobbyState) {
     return (
@@ -276,6 +344,11 @@ export default function GamePage() {
               Lobby {lobbyCode}
             </h1>
             <div className="mt-3 flex flex-wrap gap-2">
+              {!isSocketConnected && (
+                <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
+                  Reconnecting…
+                </span>
+              )}
               {raceSnapshot && (
                 <>
                   <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
@@ -313,6 +386,11 @@ export default function GamePage() {
                 ? 'This session is running from OpenF1 historical telemetry at 10x speed. The server watches the replay for question-bank triggers, then Groq/Llama rewrites the prompt and explains each resolution.'
                 : 'This session follows live telemetry. Questions appear only when the server-side trigger engine finds a valid race situation.'}
             </p>
+            {connectionNotice && (
+              <p className="mt-3 border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 font-display text-[11px] uppercase tracking-[0.14em]">
+                {connectionNotice}
+              </p>
+            )}
             {raceSnapshot && (
               <LapProgressBar
                 lapNumber={raceSnapshot.lapNumber}
@@ -369,11 +447,17 @@ export default function GamePage() {
               </Card>
             )}
 
-            {currentQuestion && questionState === 'LOCKED' && (
+            {showQuestionWaitingState && (
               <Card tone="default" className="p-8 text-center">
-                <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Answers Locked</p>
-                <p className="mt-4 font-display text-4xl uppercase leading-tight">{currentQuestion.questionText}</p>
-                <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">Awaiting lap completion and resolution.</p>
+                <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                  {questionState === 'ACTIVE' ? 'Question Active' : 'Answers Locked'}
+                </p>
+                <p className="mt-4 font-display text-4xl uppercase leading-tight">{currentQuestion?.questionText}</p>
+                <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
+                  {questionState === 'ACTIVE'
+                    ? 'Outcome is now tied to live race telemetry. Waiting for the next resolution signal.'
+                    : 'Awaiting lap completion and resolution.'}
+                </p>
               </Card>
             )}
 

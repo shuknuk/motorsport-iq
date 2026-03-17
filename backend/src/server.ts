@@ -6,7 +6,9 @@ import cors from 'cors';
 import supabase from './db/supabaseClient';
 import type {
   CreateProblemReportInput,
+  Difficulty,
   ProblemReportStatus,
+  QuestionCategory,
   QuestionInstanceState,
   RaceSnapshot,
   RaceSnapshotEvent,
@@ -38,6 +40,7 @@ import { OpenF1Client } from './data/openf1Client';
 import { selectQuestion, clearCooldowns } from './engine/questionEngine';
 import { SessionRuntimeManager, toSessionInfo } from './runtime/sessionRuntimeManager';
 import { PresenceManager, type PresenceExpiryReason } from './lobby/presenceManager';
+import { buildQuestionEventPayload, isUnresolvedQuestionState } from './lobby/questionPayload';
 import {
   clearAdminSessionCookie,
   requireAdminSession,
@@ -53,10 +56,65 @@ import {
 } from './admin/reporting';
 import { generateSuggestedStatKeys } from './ai/statHintGenerator';
 import { getQuestionById } from './engine/questionBank';
+import type { CorsOptions } from 'cors';
 
 const app = express();
-const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+const DEFAULT_ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'https://motorsport-iq.vercel.app',
+];
+
+function parseAllowedOrigins(value: string | undefined): string[] {
+  const configuredOrigins = value
+    ?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? [];
+
+  const allowedOrigins = configuredOrigins.length > 0
+    ? configuredOrigins
+    : DEFAULT_ALLOWED_ORIGINS;
+
+  return [...new Set(allowedOrigins)];
+}
+
+const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
+const DEFAULT_PRESENCE_DISCONNECT_GRACE_MS = 2 * 60 * 1000;
+
+function parsePositiveNumberEnv(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+const presenceDisconnectGraceMs = parsePositiveNumberEnv(
+  process.env.PRESENCE_DISCONNECT_GRACE_MS,
+  DEFAULT_PRESENCE_DISCONNECT_GRACE_MS
+);
+
+function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  return allowedOrigins.includes(origin);
+}
+
+const corsOptions: CorsOptions = {
+  origin(origin, callback) {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin ${origin ?? 'unknown'} is not allowed by CORS`));
+  },
   methods: ['GET', 'POST', 'PATCH'],
   credentials: true,
 };
@@ -81,6 +139,8 @@ function toRaceSnapshotEvent(snapshot: RaceSnapshot): RaceSnapshotEvent {
     timestamp: snapshot.timestamp.toISOString(),
     leaderLapTime: snapshot.leaderLapTime,
     leader: leader?.name ?? '',
+    leaderNameSource: leader?.nameSource ?? 'unknown',
+    leaderTelemetryTimestamp: leader?.lastTelemetryTimestamp ?? null,
     leaderStats: leader
       ? {
           name: leader.name,
@@ -300,6 +360,7 @@ async function handleUserRemoval(
 }
 
 const presenceManager = new PresenceManager({
+  disconnectGraceMs: presenceDisconnectGraceMs,
   onExpire: async (entry, reason) => {
     await handleUserRemoval(entry.userId, reason, entry.socketId);
   },
@@ -354,14 +415,11 @@ async function checkAndTriggerQuestion(lobbyId: string, snapshot: RaceSnapshot):
 
     // Broadcast question event
     io.to(lobbyId).emit('question_event', {
-      instanceId: newQuestion.id,
-      questionId: newQuestion.questionId,
-      questionText: newQuestion.questionText,
-      category: getQuestionCategory(newQuestion.questionId),
-      difficulty: getQuestionDifficulty(newQuestion.questionId),
-      windowSize: newQuestion.windowSize,
-      triggeredAt: newQuestion.triggeredAt.toISOString(),
-      answerDeadline: new Date(newQuestion.triggeredAt.getTime() + 20000).toISOString(),
+      ...buildQuestionEventPayload(
+        newQuestion,
+        getQuestionCategory(newQuestion.questionId),
+        getQuestionDifficulty(newQuestion.questionId)
+      ),
       suggestedStatKeys,
     });
 
@@ -455,15 +513,15 @@ function broadcastRaceSnapshot(snapshot: RaceSnapshot, lobbyIds: Set<string>): v
 /**
  * Get question category
  */
-function getQuestionCategory(questionId: string): string {
+function getQuestionCategory(questionId: string): QuestionCategory {
   const question = getQuestionById(questionId);
-  return question?.category ?? 'UNKNOWN';
+  return question?.category ?? 'GAP_CLOSING';
 }
 
 /**
  * Get question difficulty
  */
-function getQuestionDifficulty(questionId: string): string {
+function getQuestionDifficulty(questionId: string): Difficulty {
   const question = getQuestionById(questionId);
   return question?.difficulty ?? 'MEDIUM';
 }
@@ -649,19 +707,22 @@ io.on('connection', (socket) => {
 
       // Send active question if any
       const activeQuestion = getActiveQuestion(lobbyId);
-      if (activeQuestion && activeQuestion.state === 'LIVE') {
-      socket.emit('question_event', {
-        instanceId: activeQuestion.id,
-        questionId: activeQuestion.questionId,
-        questionText: activeQuestion.questionText,
-        category: getQuestionCategory(activeQuestion.questionId),
-        difficulty: getQuestionDifficulty(activeQuestion.questionId),
-        windowSize: activeQuestion.windowSize,
-        triggeredAt: activeQuestion.triggeredAt.toISOString(),
-        answerDeadline: new Date(activeQuestion.triggeredAt.getTime() + 20000).toISOString(),
-        suggestedStatKeys: activeQuestion.suggestedStatKeys ?? [],
-      });
-    }
+      if (activeQuestion && isUnresolvedQuestionState(activeQuestion.state)) {
+        socket.emit('question_event', buildQuestionEventPayload(
+          activeQuestion,
+          getQuestionCategory(activeQuestion.questionId),
+          getQuestionDifficulty(activeQuestion.questionId),
+          { includeState: true }
+        ));
+
+        if (activeQuestion.state !== 'LIVE') {
+          socket.emit('question_state', {
+            instanceId: activeQuestion.id,
+            state: activeQuestion.state,
+            cancelledReason: activeQuestion.cancelledReason,
+          });
+        }
+      }
 
       if (lobbyState.latestResolution) {
         socket.emit('resolution_event', lobbyState.latestResolution);

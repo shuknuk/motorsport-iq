@@ -117,6 +117,7 @@ export interface QuestionEvent {
   questionText: string;
   category: QuestionCategory;
   difficulty: Difficulty;
+  state?: QuestionState;
   windowSize: number;
   triggeredAt: string;
   answerDeadline: string;
@@ -182,6 +183,8 @@ export interface RaceSnapshotEvent {
   timestamp: string;
   leaderLapTime: number | null;
   leader: string;
+  leaderNameSource?: 'full_name' | 'broadcast_name' | 'unknown';
+  leaderTelemetryTimestamp?: string | null;
   leaderStats: LeaderStats | null;
   topThree: string[];
   dataFeedStalled: boolean;

@@ -12,6 +12,7 @@ function createDriver(overrides: Partial<DriverState> = {}): DriverState {
     interval: 1.2,
     tyreCompound: 'MEDIUM',
     tyreAge: 16,
+    stintNumber: null,
     drsEnabled: true,
     pitCount: 0,
     lastLapTime: 91.2,

@@ -1,4 +1,11 @@
-import type { OpenF1Driver, OpenF1Lap, OpenF1RaceControl } from '../types';
+import type {
+  OpenF1Driver,
+  OpenF1Interval,
+  OpenF1Lap,
+  OpenF1Position,
+  OpenF1RaceControl,
+  OpenF1Stint,
+} from '../types';
 import { SnapshotStore } from './snapshotStore';
 
 function createDriver(overrides: Partial<OpenF1Driver> = {}): OpenF1Driver {
@@ -55,6 +62,44 @@ function createRaceControl(overrides: Partial<OpenF1RaceControl> = {}): OpenF1Ra
   };
 }
 
+function createPosition(overrides: Partial<OpenF1Position> = {}): OpenF1Position {
+  return {
+    date: '2025-09-01T13:05:00Z',
+    meeting_key: 2001,
+    session_key: 1001,
+    driver_number: 1,
+    position: 1,
+    ...overrides,
+  };
+}
+
+function createInterval(overrides: Partial<OpenF1Interval> = {}): OpenF1Interval {
+  return {
+    date: '2025-09-01T13:05:00Z',
+    meeting_key: 2001,
+    session_key: 1001,
+    driver_number: 1,
+    gap_to_leader: 0,
+    interval: null,
+    ...overrides,
+  };
+}
+
+function createStint(overrides: Partial<OpenF1Stint> = {}): OpenF1Stint {
+  return {
+    date: '2025-09-01T13:05:00Z',
+    session_key: 1001,
+    meeting_key: 2001,
+    driver_number: 1,
+    stint_number: 1,
+    lap_start: 1,
+    lap_end: null,
+    compound: 'SOFT',
+    tyre_age_at_start: 0,
+    ...overrides,
+  };
+}
+
 describe('SnapshotStore race control updates', () => {
   it('rebuilds and emits the snapshot immediately when track status changes', async () => {
     const onSnapshotUpdate = jest.fn();
@@ -74,5 +119,53 @@ describe('SnapshotStore race control updates', () => {
     expect(parseTrackStatus).toHaveBeenCalledWith([createRaceControl()]);
     expect(onSnapshotUpdate).toHaveBeenCalledTimes(1);
     expect(store.getCurrentSnapshot()?.trackStatus).toBe('YELLOW');
+  });
+
+  it('prefers OpenF1 full_name over broadcast_name for displayed identity', async () => {
+    const client = {
+      getDrivers: jest.fn(async () => [createDriver({ full_name: 'Max Verstappen', broadcast_name: 'VER' })]),
+      parseTrackStatus: jest.fn(() => 'GREEN' as const),
+    } as any;
+
+    const store = new SnapshotStore(client);
+    await store.initialize(1001, { sessionMode: 'replay', replaySpeed: 10 });
+    store.processPositionUpdate([createPosition({ position: 1 })]);
+    store.processIntervalUpdate([createInterval()]);
+    store.processStintUpdate([createStint()]);
+    store.processLapCompletion(createLap());
+
+    expect(store.getCurrentSnapshot()?.drivers[0]?.name).toBe('Max Verstappen');
+    expect(store.getCurrentSnapshot()?.drivers[0]?.nameSource).toBe('full_name');
+  });
+
+  it('keeps newest telemetry records by timestamp for position, interval, and stint', async () => {
+    const client = {
+      getDrivers: jest.fn(async () => [createDriver()]),
+      parseTrackStatus: jest.fn(() => 'GREEN' as const),
+    } as any;
+
+    const store = new SnapshotStore(client);
+    await store.initialize(1001, { sessionMode: 'replay', replaySpeed: 10 });
+
+    store.processPositionUpdate([
+      createPosition({ date: '2025-09-01T13:06:00Z', position: 2 }),
+      createPosition({ date: '2025-09-01T13:05:00Z', position: 5 }),
+    ]);
+    store.processIntervalUpdate([
+      createInterval({ date: '2025-09-01T13:06:00Z', gap_to_leader: 1.2, interval: 0.8 }),
+      createInterval({ date: '2025-09-01T13:05:00Z', gap_to_leader: 3.4, interval: 2.1 }),
+    ]);
+    store.processStintUpdate([
+      createStint({ date: '2025-09-01T13:06:00Z', compound: 'MEDIUM', stint_number: 2 }),
+      createStint({ date: '2025-09-01T13:05:00Z', compound: 'SOFT', stint_number: 1 }),
+    ]);
+
+    store.processLapCompletion(createLap({ lap_number: 2 }));
+    const leader = store.getCurrentSnapshot()?.drivers[0];
+
+    expect(leader?.position).toBe(2);
+    expect(leader?.gap).toBe(1.2);
+    expect(leader?.interval).toBe(0.8);
+    expect(leader?.tyreCompound).toBe('MEDIUM');
   });
 });

@@ -4,6 +4,8 @@
 export interface DriverState {
   driverNumber: number;
   name: string;
+  nameSource?: 'full_name' | 'broadcast_name' | 'unknown';
+  lastTelemetryTimestamp?: string | null;
   team: string;
   position: number;
   gap: number | null; // Gap to leader in seconds
@@ -140,6 +142,7 @@ export interface OpenF1Pit {
 }
 
 export interface OpenF1Stint {
+  date?: string | null;
   session_key: number;
   meeting_key: number;
   driver_number: number;
@@ -299,6 +302,7 @@ export interface QuestionEvent {
   questionText: string;
   category: QuestionCategory;
   difficulty: Difficulty;
+  state?: InstanceState;
   windowSize: number;
   triggeredAt: string;
   answerDeadline: string;
@@ -364,6 +368,8 @@ export interface RaceSnapshotEvent {
   timestamp: string;
   leaderLapTime: number | null;
   leader: string;
+  leaderNameSource?: 'full_name' | 'broadcast_name' | 'unknown';
+  leaderTelemetryTimestamp?: string | null;
   leaderStats: LeaderStats | null;
   topThree: string[];
   dataFeedStalled: boolean;

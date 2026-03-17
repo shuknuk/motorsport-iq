@@ -22,12 +22,25 @@ export default function Home() {
   const [statusYear] = useState<number>(() => new Date().getFullYear());
   const [isStatusLoading, setIsStatusLoading] = useState(true);
   const [statusFetchError, setStatusFetchError] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const socket = getSocketClient();
     socket.connect();
 
     const unsubscribers = [
+      socket.on('connected', () => {
+        setIsReconnecting(false);
+        setConnectionNotice(null);
+      }),
+      socket.on('disconnected', () => {
+        setIsReconnecting(true);
+      }),
+      socket.on('connection_error', ({ message }: { message: string }) => {
+        setIsReconnecting(true);
+        setConnectionNotice(message);
+      }),
       socket.on(SERVER_EVENTS.LOBBY_STATE, (state: LobbyState) => {
         setIsLoading(false);
         localStorage.setItem('msp_username', username);
@@ -269,6 +282,11 @@ export default function Home() {
             {error && (
               <p className="mt-4 border border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent),transparent_90%)] px-4 py-3 text-sm uppercase tracking-[0.12em] text-[var(--color-fg)]">
                 {error}
+              </p>
+            )}
+            {(isReconnecting || connectionNotice) && (
+              <p className="mt-4 border border-[var(--color-border)] bg-[var(--color-muted)] px-4 py-3 text-sm uppercase tracking-[0.12em] text-[var(--color-fg)]">
+                {connectionNotice ?? 'Reconnecting to live race server…'}
               </p>
             )}
           </Card>

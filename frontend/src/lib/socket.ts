@@ -24,16 +24,20 @@ class SocketClient {
   private lastError: ConnectionError | null = null;
 
   connect(): Socket {
-    if (this.socket?.connected) {
+    if (this.socket) {
+      if (!this.socket.connected) {
+        this.socket.connect();
+      }
       return this.socket;
     }
 
     this.socket = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
+      timeout: 10000,
     });
 
     this.setupEventHandlers();
@@ -55,13 +59,32 @@ class SocketClient {
       this.emit('connected', undefined);
     });
 
-    this.socket.on('disconnect', () => {
-      this.emit('disconnected', undefined);
+    this.socket.on('disconnect', (reason: string) => {
+      this.emit('disconnected', { reason });
+      this.emit('reconnecting', { reason });
     });
 
-    this.socket.on('connect_error', () => {
-      this.lastError = { message: 'Connection failed' };
-      this.emit('error', this.lastError);
+    this.socket.on('connect_error', (error: Error & { description?: unknown }) => {
+      const details = typeof error.description === 'string'
+        ? error.description
+        : error.message;
+
+      this.lastError = {
+        message: details
+          ? `Connection failed: ${details}`
+          : 'Connection failed. The live game server may be unavailable.',
+      };
+      this.emit('connection_error', this.lastError);
+    });
+
+    this.socket.io.on('reconnect_attempt', (attempt: number) => {
+      this.emit('reconnecting', { attempt });
+    });
+
+    this.socket.io.on('reconnect_failed', () => {
+      const message = 'Unable to reconnect to the live game server.';
+      this.lastError = { message };
+      this.emit('connection_error', { message });
     });
 
     this.socket.on(SERVER_EVENTS.LOBBY_STATE, (state: LobbyState) => {

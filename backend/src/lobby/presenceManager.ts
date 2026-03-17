@@ -18,7 +18,7 @@ interface PresenceManagerOptions {
 }
 
 const DEFAULT_INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
-const DEFAULT_DISCONNECT_GRACE_MS = 30 * 1000;
+const DEFAULT_DISCONNECT_GRACE_MS = 2 * 60 * 1000;
 const DEFAULT_SWEEP_INTERVAL_MS = 30 * 1000;
 
 export class PresenceManager {
@@ -64,6 +64,7 @@ export class PresenceManager {
     if (!entry) return;
 
     entry.lastSeenAt = Date.now();
+    entry.disconnectDeadline = null;
     entry.expiring = false;
   }
 
@@ -107,15 +108,14 @@ export class PresenceManager {
         continue;
       }
 
-      if (entry.connected && now - entry.lastSeenAt >= this.inactivityTimeoutMs) {
+      if (now - entry.lastSeenAt >= this.inactivityTimeoutMs) {
         entry.expiring = true;
         await this.onExpire({ ...entry }, 'inactive');
         continue;
       }
 
       if (!entry.connected && entry.disconnectDeadline !== null && now >= entry.disconnectDeadline) {
-        entry.expiring = true;
-        await this.onExpire({ ...entry }, 'disconnected_timeout');
+        entry.disconnectDeadline = null;
       }
     }
   }

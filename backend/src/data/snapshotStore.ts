@@ -28,6 +28,21 @@ interface DriverData {
   latestStint: OpenF1Stint | null;
 }
 
+const DEBUG_DRIVER_PROVENANCE = process.env.DEBUG_DRIVER_PROVENANCE === 'true';
+
+function toTimestamp(value: string | null | undefined): number {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function hasNewerTimestamp(
+  incoming: string | null | undefined,
+  existing: string | null | undefined
+): boolean {
+  return toTimestamp(incoming) >= toTimestamp(existing);
+}
+
 export class SnapshotStore {
   private sessionId: string | null = null;
   private currentSnapshot: RaceSnapshot | null = null;
@@ -123,7 +138,7 @@ export class SnapshotStore {
   processPositionUpdate(positions: OpenF1Position[]): void {
     for (const pos of positions) {
       const driverData = this.drivers.get(pos.driver_number);
-      if (driverData) {
+      if (driverData && hasNewerTimestamp(pos.date, driverData.latestPosition?.date)) {
         driverData.latestPosition = pos;
       }
     }
@@ -138,7 +153,7 @@ export class SnapshotStore {
 
     for (const interval of intervals) {
       const driverData = this.drivers.get(interval.driver_number);
-      if (driverData) {
+      if (driverData && hasNewerTimestamp(interval.date, driverData.latestInterval?.date)) {
         driverData.latestInterval = interval;
       }
     }
@@ -164,7 +179,18 @@ export class SnapshotStore {
       }
 
       const currentStint = driverData.latestStint;
+      const hasStintTimestamp = Boolean(stint.date);
+      const hasCurrentTimestamp = Boolean(currentStint?.date);
       const shouldReplace = !currentStint
+        || (
+          hasStintTimestamp
+          && hasCurrentTimestamp
+          && hasNewerTimestamp(stint.date, currentStint.date)
+        )
+        || (
+          hasStintTimestamp
+          && !hasCurrentTimestamp
+        )
         || stint.stint_number > currentStint.stint_number
         || (
           stint.stint_number === currentStint.stint_number
@@ -216,10 +242,18 @@ export class SnapshotStore {
       if (!data.driver) continue;
 
       const tyreAge = this.calculateTyreAge(data);
+      const name = data.driver.full_name || data.driver.broadcast_name || `Driver ${driverNumber}`;
+      const nameSource = data.driver.full_name
+        ? 'full_name'
+        : data.driver.broadcast_name
+          ? 'broadcast_name'
+          : 'unknown';
 
       driverStates.push({
         driverNumber,
-        name: data.driver.broadcast_name || data.driver.full_name,
+        name,
+        nameSource,
+        lastTelemetryTimestamp: this.getDriverTelemetryTimestamp(data),
         team: data.driver.team_name,
         position: data.latestPosition?.position ?? 0,
         gap: data.latestInterval?.gap_to_leader ?? null,
@@ -252,6 +286,14 @@ export class SnapshotStore {
       leaderLapTime: leader?.lastLapTime ?? null,
     };
 
+    if (DEBUG_DRIVER_PROVENANCE && leader) {
+      console.debug('[snapshot-driver-provenance]', {
+        leader: leader.name,
+        source: leader.nameSource ?? 'unknown',
+        telemetryTimestamp: leader.lastTelemetryTimestamp ?? null,
+      });
+    }
+
     this.options.onSnapshotUpdate?.(this.currentSnapshot);
   }
 
@@ -276,6 +318,29 @@ export class SnapshotStore {
     }
 
     return Math.max(tyreAgeAtStart, tyreAgeAtStart + Math.max(0, this.lapNumber - lapStart));
+  }
+
+  private getDriverTelemetryTimestamp(data: DriverData): string | null {
+    const timestamps = [
+      data.latestPosition?.date ?? null,
+      data.latestInterval?.date ?? null,
+      data.latestLap?.date_start ?? null,
+      data.latestStint?.date ?? null,
+      data.pits.length > 0 ? data.pits[data.pits.length - 1]?.date ?? null : null,
+    ];
+
+    let latestValue: string | null = null;
+    let latestTimestamp = 0;
+
+    for (const value of timestamps) {
+      const parsed = toTimestamp(value);
+      if (parsed >= latestTimestamp && value) {
+        latestTimestamp = parsed;
+        latestValue = value;
+      }
+    }
+
+    return latestValue;
   }
 
   calculateDerivedSignals(): DerivedSignals {
