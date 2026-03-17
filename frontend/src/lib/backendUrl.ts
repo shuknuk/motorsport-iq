@@ -1,3 +1,5 @@
+const PRODUCTION_BACKEND_URL = 'https://motorsport-iq-backend-production.up.railway.app';
+
 export function resolveBackendUrl(): string {
   const configuredUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
   if (configuredUrl) return configuredUrl;
@@ -8,6 +10,11 @@ export function resolveBackendUrl(): string {
 
   if (window.location.hostname === 'localhost') {
     return 'http://localhost:4000';
+  }
+
+  // When deployed on Vercel, use the Railway backend
+  if (window.location.hostname.includes('vercel.app')) {
+    return PRODUCTION_BACKEND_URL;
   }
 
   return window.location.origin;
