@@ -70,3 +70,10 @@
 ## Detailed Engine Reference
 - The subsystem-level implementation guidance lives in [.agent/skills/f1-engine/SKILL.md](/Users/shuknuk/Developer/motorsport-iq/.agent/skills/f1-engine/SKILL.md).
 - Keep that skill aligned with this project-wide ruleset whenever engine behavior changes.
+
+## Deployment Check Before Git Push
+- Whenever pushing changes to Git, explicitly check whether the diff includes backend code, frontend code, database/schema changes, or environment-variable changes.
+- If `backend/` changed, assume Railway backend redeploy is required and call that out in the handoff.
+- If only `frontend/` changed, call out the frontend deployment requirement for the hosting target in the handoff.
+- If `backend/schema/`, Supabase SQL, RLS policies, database functions, or Supabase-related env vars changed, call out that Supabase changes must also be applied.
+- If no schema or Supabase config changed, explicitly state that no Supabase action is required.
