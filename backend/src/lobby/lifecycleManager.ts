@@ -183,6 +183,33 @@ async function transitionToLocked(
   if (instance.state !== 'LIVE') return;
   questionTimers.delete(instance.id);
 
+  // Get all players in the lobby and create NO_ANSWER entries for those who didn't answer
+  const lobbyState = await getLobbyState(instance.lobbyId);
+  if (lobbyState) {
+    // Get existing answers
+    const { data: existingAnswers } = await supabase
+      .from('answers')
+      .select('user_id')
+      .eq('instance_id', instance.id);
+
+    const answeredUserIds = new Set(existingAnswers?.map(a => a.user_id) ?? []);
+
+    // Find players who didn't answer
+    const unansweredPlayers = lobbyState.players.filter(p => !answeredUserIds.has(p.id));
+
+    // Create NO_ANSWER entries for them
+    if (unansweredPlayers.length > 0) {
+      const noAnswerEntries = unansweredPlayers.map(player => ({
+        instance_id: instance.id,
+        user_id: player.id,
+        answer: 'NO_ANSWER' as const,
+        response_time_ms: null as number | null,
+      }));
+
+      await supabase.from('answers').insert(noAnswerEntries);
+    }
+  }
+
   instance.state = 'LOCKED';
   await updateQuestionState(instance.id, 'LOCKED');
   onStateChange({ ...instance });

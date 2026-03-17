@@ -60,6 +60,7 @@ export default function GamePage() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState<boolean>(() => getSocketClient().isConnected());
   const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
   const hydrateQuestionFromLobby = useEffectEvent((state: LobbyState) => {
@@ -341,10 +342,19 @@ export default function GamePage() {
     }
   }, [currentUserId, isSubmittingReport, reportNote, reportReason, resolution]);
 
-  const handleLeaveSession = useCallback(() => {
-    localStorage.removeItem('msp_user_id');
-    getSocketClient().leaveLobby();
-    router.push('/');
+  const handleLeaveSession = useCallback(async () => {
+    setIsLeaving(true);
+    try {
+      await new Promise<void>((resolve) => {
+        getSocketClient().leaveLobby();
+        // Give socket time to send event
+        setTimeout(resolve, 300);
+      });
+    } finally {
+      localStorage.removeItem('msp_user_id');
+      getSocketClient().disconnect();
+      router.push('/');
+    }
   }, [router]);
 
   const currentSubmittedAnswer = currentQuestion
@@ -442,174 +452,203 @@ export default function GamePage() {
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
             <ThemeToggle />
-            <Button variant="ghost" onClick={handleLeaveSession}>
-              Leave Session
+            <Button variant="ghost" onClick={handleLeaveSession} disabled={isLeaving}>
+              {isLeaving ? 'Leaving…' : 'Leave Session'}
             </Button>
           </div>
         </header>
 
         <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
           <div>
-            {showWinnerScreen && (
-              <WinnerScreen
-                entries={leaderboard}
-                onBackToLobby={() => router.push(`/lobby/${lobbyCode}`)}
-              />
-            )}
+            {/* Priority order: Winner > Resolution > Question LIVE > Question Waiting > Waiting State */}
+            {(() => {
+              // 1. Winner screen (highest priority)
+              if (showWinnerScreen) {
+                return (
+                  <WinnerScreen
+                    key="winner-screen"
+                    entries={leaderboard}
+                    onBackToLobby={() => router.push(`/lobby/${lobbyCode}`)}
+                  />
+                );
+              }
 
-            {currentQuestion && questionState === 'LIVE' && (
-              <Card tone="muted" className="swiss-grid-pattern relative p-6 md:p-8">
-                <div className="mb-6 flex justify-center">
-                  <CountdownTimer deadline={currentQuestion.answerDeadline} size="lg" />
-                </div>
-                <QuestionCard
-                  questionText={currentQuestion.questionText}
-                  category={currentQuestion.category}
-                  difficulty={currentQuestion.difficulty}
-                  instanceId={currentQuestion.instanceId}
-                  onSubmit={handleSubmitAnswer}
-                  answered={currentSubmittedAnswer}
-                />
-
-                {isProcessingAnswer && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg),transparent_12%)] p-6 backdrop-blur-sm">
-                    <div className="w-full max-w-md border-2 border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-panel),transparent_6%)] p-6 text-center shadow-[0_0_0_2px_rgba(255,24,1,0.15)]">
-                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-4 border-[var(--color-border)] border-t-[var(--color-accent)] animate-spin" />
-                      <p className="mt-5 font-display text-2xl uppercase tracking-[0.14em]">Pit Wall Processing</p>
-                      <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
-                        Locking in your call and syncing it with the race control room.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            )}
-
-            {showQuestionWaitingState && (
-              <Card tone="default" className="p-8 text-center">
-                <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
-                  {questionState === 'ACTIVE' ? 'Question Active' : 'Answers Locked'}
-                </p>
-                <p className="mt-4 font-display text-4xl uppercase leading-tight">{currentQuestion?.questionText}</p>
-                <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
-                  {questionState === 'ACTIVE'
-                    ? 'Outcome is now tied to live race telemetry. Waiting for the next resolution signal.'
-                    : 'Awaiting lap completion and resolution.'}
-                </p>
-              </Card>
-            )}
-
-            {resolution && !showWinnerScreen && (
-              <Card tone="default" className="p-6 md:p-8">
-                <SectionLabel index="04A" label="Resolution" className="mb-4" />
-                <h2 className="font-display text-4xl uppercase leading-tight md:text-5xl">{resolution.questionText}</h2>
-                <p className="mt-3 font-display text-sm uppercase tracking-[0.16em] text-[var(--color-muted-fg)]">
-                  Correct Answer: <span className="text-[var(--color-accent)]">{resolution.correctAnswer}</span>
-                </p>
-                {resolvedAnswer && (
-                  <p
-                    className={`mt-2 font-display text-sm uppercase tracking-[0.16em] ${
-                      resolvedAnswerIsCorrect ? 'text-[#00C853]' : 'text-[#D50000]'
-                    }`}
+              // 2. Resolution display
+              if (resolution) {
+                return (
+                  <Card
+                    key={`resolution-${resolution.instanceId}`}
+                    tone="default"
+                    className="p-6 md:p-8"
                   >
-                    Your Answer: <span>{resolvedAnswer}</span>
-                  </p>
-                )}
-                <div className="mt-5 border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-4">
-                  <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Explanation</p>
-                  <p className="mt-2 font-body text-sm leading-relaxed">{resolution.explanation}</p>
-                </div>
-                <div className="mt-5 border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Problem Reporting</p>
-                      <p className="mt-2 font-body text-sm text-[var(--color-muted-fg)]">
-                        If the AI resolved this question incorrectly, send it to the admin review queue.
+                    <SectionLabel index="04A" label="Resolution" className="mb-4" />
+                    <h2 className="font-display text-4xl uppercase leading-tight md:text-5xl">{resolution.questionText}</h2>
+                    <p className="mt-3 font-display text-sm uppercase tracking-[0.16em] text-[var(--color-muted-fg)]">
+                      Correct Answer: <span className="text-[var(--color-accent)]">{resolution.correctAnswer}</span>
+                    </p>
+                    {resolvedAnswer && (
+                      <p
+                        className={`mt-2 font-display text-sm uppercase tracking-[0.16em] ${
+                          resolvedAnswerIsCorrect ? 'text-[#00C853]' : 'text-[#D50000]'
+                        }`}
+                      >
+                        Your Answer: <span>{resolvedAnswer}</span>
                       </p>
+                    )}
+                    <div className="mt-5 border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-4">
+                      <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Explanation</p>
+                      <p className="mt-2 font-body text-sm leading-relaxed">{resolution.explanation}</p>
                     </div>
-                    <Button
-                      variant={reportSuccess ? 'secondary' : 'primary'}
-                      size="sm"
-                      disabled={reportSuccess}
-                      onClick={() => setIsReportFormOpen((current) => !current)}
-                    >
-                      {reportSuccess ? 'Reported' : isReportFormOpen ? 'Close Report' : 'Report a Problem'}
-                    </Button>
-                  </div>
-
-                  {isReportFormOpen && !reportSuccess && (
-                    <div className="mt-4 grid gap-4 border-t-2 border-[var(--color-border)] pt-4">
-                      <label className="block">
-                        <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
-                          Reason
-                        </span>
-                        <select
-                          value={reportReason}
-                          onChange={(event) => setReportReason(event.target.value as ProblemReportReason)}
-                          className="h-12 w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 font-display text-sm uppercase focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
-                        >
-                          {REPORT_REASON_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <label className="block">
-                        <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
-                          Optional Note
-                        </span>
-                        <textarea
-                          value={reportNote}
-                          onChange={(event) => setReportNote(event.target.value)}
-                          rows={4}
-                          placeholder="Add the telemetry detail or answer mismatch you think is wrong."
-                          className="w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 font-body text-sm text-[var(--color-fg)] placeholder:text-[var(--color-muted-fg)] focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
-                        />
-                      </label>
-
+                    <div className="mt-5 border-2 border-[var(--color-border)] bg-[var(--color-bg)] p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="font-body text-xs text-[var(--color-muted-fg)]">
-                          One report per player per question. Re-submitting updates your previous report.
-                        </p>
-                        <Button size="sm" onClick={handleSubmitReport} disabled={isSubmittingReport}>
-                          {isSubmittingReport ? 'Submitting…' : 'Send Report'}
+                        <div>
+                          <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Problem Reporting</p>
+                          <p className="mt-2 font-body text-sm text-[var(--color-muted-fg)]">
+                            If the AI resolved this question incorrectly, send it to the admin review queue.
+                          </p>
+                        </div>
+                        <Button
+                          variant={reportSuccess ? 'secondary' : 'primary'}
+                          size="sm"
+                          disabled={reportSuccess}
+                          onClick={() => setIsReportFormOpen((current) => !current)}
+                        >
+                          {reportSuccess ? 'Reported' : isReportFormOpen ? 'Close Report' : 'Report a Problem'}
                         </Button>
                       </div>
+
+                      {isReportFormOpen && !reportSuccess && (
+                        <div className="mt-4 grid gap-4 border-t-2 border-[var(--color-border)] pt-4">
+                          <label className="block">
+                            <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                              Reason
+                            </span>
+                            <select
+                              value={reportReason}
+                              onChange={(event) => setReportReason(event.target.value as ProblemReportReason)}
+                              className="h-12 w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 font-display text-sm uppercase focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
+                            >
+                              {REPORT_REASON_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="block">
+                            <span className="mb-2 block font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                              Optional Note
+                            </span>
+                            <textarea
+                              value={reportNote}
+                              onChange={(event) => setReportNote(event.target.value)}
+                              rows={4}
+                              placeholder="Add the telemetry detail or answer mismatch you think is wrong."
+                              className="w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 font-body text-sm text-[var(--color-fg)] placeholder:text-[var(--color-muted-fg)] focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
+                            />
+                          </label>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="font-body text-xs text-[var(--color-muted-fg)]">
+                              One report per player per question. Re-submitting updates your previous report.
+                            </p>
+                            <Button size="sm" onClick={handleSubmitReport} disabled={isSubmittingReport}>
+                              {isSubmittingReport ? 'Submitting…' : 'Send Report'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {reportSuccess && (
+                        <p className="mt-4 font-display text-xs uppercase tracking-[0.16em] text-[var(--color-accent)]">
+                          Report submitted to admin review.
+                        </p>
+                      )}
+
+                      {reportError && (
+                        <p className="mt-4 font-display text-xs uppercase tracking-[0.16em] text-[var(--color-accent)]">
+                          {reportError}
+                        </p>
+                      )}
                     </div>
-                  )}
+                  </Card>
+                );
+              }
 
-                  {reportSuccess && (
-                    <p className="mt-4 font-display text-xs uppercase tracking-[0.16em] text-[var(--color-accent)]">
-                      Report submitted to admin review.
+              // 3. Question LIVE state
+              if (currentQuestion && questionState === 'LIVE') {
+                return (
+                  <Card
+                    key={`question-live-${currentQuestion.instanceId}`}
+                    tone="muted"
+                    className="swiss-grid-pattern relative p-6 md:p-8"
+                  >
+                    <div className="mb-6 flex justify-center">
+                      <CountdownTimer deadline={currentQuestion.answerDeadline} size="lg" />
+                    </div>
+                    <QuestionCard
+                      questionText={currentQuestion.questionText}
+                      category={currentQuestion.category}
+                      difficulty={currentQuestion.difficulty}
+                      instanceId={currentQuestion.instanceId}
+                      onSubmit={handleSubmitAnswer}
+                      answered={currentSubmittedAnswer}
+                    />
+
+                    {isProcessingAnswer && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg),transparent_12%)] p-6 backdrop-blur-sm">
+                        <div className="w-full max-w-md border-2 border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-panel),transparent_6%)] p-6 text-center shadow-[0_0_0_2px_rgba(255,24,1,0.15)]">
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-4 border-[var(--color-border)] border-t-[var(--color-accent)] animate-spin" />
+                          <p className="mt-5 font-display text-2xl uppercase tracking-[0.14em]">Pit Wall Processing</p>
+                          <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
+                            Locking in your call and syncing it with the race control room.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                );
+              }
+
+              // 4. Question waiting state (TRIGGERED, LOCKED, ACTIVE)
+              if (showQuestionWaitingState && currentQuestion) {
+                return (
+                  <Card
+                    key={`question-waiting-${currentQuestion.instanceId}`}
+                    tone="default"
+                    className="p-8 text-center"
+                  >
+                    <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                      {questionState === 'ACTIVE' ? 'Question Active' : 'Answers Locked'}
                     </p>
-                  )}
-
-                  {reportError && (
-                    <p className="mt-4 font-display text-xs uppercase tracking-[0.16em] text-[var(--color-accent)]">
-                      {reportError}
+                    <p className="mt-4 font-display text-4xl uppercase leading-tight">{currentQuestion.questionText}</p>
+                    <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
+                      {questionState === 'ACTIVE'
+                        ? 'Outcome is now tied to live race telemetry. Waiting for the next resolution signal.'
+                        : 'Awaiting lap completion and resolution.'}
                     </p>
-                  )}
-                </div>
-              </Card>
-            )}
+                  </Card>
+                );
+              }
 
-            {!currentQuestion && !resolution && !showWinnerScreen && (
-              <Card tone="default" className="swiss-dots p-10 text-center md:p-16">
-                <p className="font-display text-4xl uppercase md:text-6xl">Waiting for Question</p>
-                <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
-                  {lobbyState.isReplayComplete
-                    ? 'Replay finished. Final leaderboard is locked in.'
-                    : lobbyState.sessionMode === 'replay'
-                      ? 'Next trigger arrives from accelerated historical telemetry, not broadcast video.'
-                      : 'Next trigger arrives from live race telemetry.'}
-                </p>
-                <p className="mt-4 font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
-                  Questions asked: {lobbyState.questionCount}/10
-                </p>
-              </Card>
-            )}
+              // 5. Default waiting state (lowest priority)
+              return (
+                <Card key="waiting-for-question" tone="default" className="swiss-dots p-10 text-center md:p-16">
+                  <p className="font-display text-4xl uppercase md:text-6xl">Waiting for Question</p>
+                  <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
+                    {lobbyState.isReplayComplete
+                      ? 'Replay finished. Final leaderboard is locked in.'
+                      : lobbyState.sessionMode === 'replay'
+                        ? 'Next trigger arrives from accelerated historical telemetry, not broadcast video.'
+                        : 'Next trigger arrives from live race telemetry.'}
+                  </p>
+                  <p className="mt-4 font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
+                    Questions asked: {lobbyState.questionCount}/10
+                  </p>
+                </Card>
+              );
+            })()}
           </div>
 
           <aside>

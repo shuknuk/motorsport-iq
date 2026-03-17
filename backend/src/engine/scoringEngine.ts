@@ -46,12 +46,12 @@ export function dedupeAnswersByUser(answers: Answer[]): Answer[] {
  * Calculate score for a single answer
  */
 export function calculateScore(
-  userAnswer: 'YES' | 'NO' | null,
+  userAnswer: 'YES' | 'NO' | 'NO_ANSWER' | null,
   correctAnswer: 'YES' | 'NO',
   currentStreak: number
 ): ScoreResult {
-  // No answer
-  if (userAnswer === null) {
+  // No answer (timed out or didn't submit)
+  if (userAnswer === null || userAnswer === 'NO_ANSWER') {
     return {
       pointsChange: POINTS_NO_ANSWER,
       isCorrect: false,

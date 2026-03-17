@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS answers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     instance_id UUID REFERENCES question_instances(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    answer VARCHAR(3) NOT NULL, -- 'YES' or 'NO'
+    answer VARCHAR(10) NOT NULL, -- 'YES', 'NO', or 'NO_ANSWER'
     submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     response_time_ms INTEGER, -- Time from question live to answer
     UNIQUE(instance_id, user_id) -- One answer per user per question

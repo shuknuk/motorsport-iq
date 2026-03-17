@@ -33,6 +33,9 @@ export interface SessionRuntime {
   getPreviousSnapshot(): RaceSnapshot | null;
   start(): Promise<void>;
   stop(): void;
+  pause?(): void;
+  resume?(): void;
+  isPausedState?(): boolean;
 }
 
 function cloneLobbyIds(source: Set<string>): Set<string> {
@@ -139,6 +142,8 @@ class ReplaySessionRuntime extends BaseRuntime {
   private timer: NodeJS.Timeout | null = null;
   private currentIndex = 0;
   private complete = false;
+  private isPaused = false;
+  private pauseTimer: NodeJS.Timeout | null = null;
 
   constructor(session: OpenF1Session, callbacks: RuntimeCallbacks) {
     super(session, 'replay', REPLAY_SPEED, callbacks);
@@ -150,6 +155,7 @@ class ReplaySessionRuntime extends BaseRuntime {
     this.events = [];
     this.currentIndex = 0;
     this.complete = false;
+    this.isPaused = false;
     this.client.setSession(this.session.session_key);
     await this.snapshotStore.initialize(this.session.session_key, {
       sessionMode: 'replay',
@@ -183,11 +189,34 @@ class ReplaySessionRuntime extends BaseRuntime {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    if (this.pauseTimer) {
+      clearTimeout(this.pauseTimer);
+      this.pauseTimer = null;
+    }
     this.started = false;
   }
 
+  pause(): void {
+    if (this.isPaused || !this.started) return;
+    this.isPaused = true;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
+  resume(): void {
+    if (!this.isPaused || !this.started) return;
+    this.isPaused = false;
+    this.runNext();
+  }
+
+  isPausedState(): boolean {
+    return this.isPaused;
+  }
+
   private runNext(): void {
-    if (!this.started) return;
+    if (!this.started || this.isPaused) return;
 
     const currentEvent = this.events[this.currentIndex];
     if (!currentEvent) {

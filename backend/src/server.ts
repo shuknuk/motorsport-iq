@@ -471,6 +471,16 @@ function handleStateChange(lobbyId: string, instance: QuestionInstanceState): vo
     answerDeadline,
   });
 
+  // Pause/resume replay when question goes LIVE/LOCKED
+  const runtime = runtimeManager.getRuntimeForLobby(lobbyId);
+  if (runtime?.mode === 'replay') {
+    if (instance.state === 'LIVE') {
+      runtime.pause?.();
+    } else if (instance.state === 'LOCKED') {
+      runtime.resume?.();
+    }
+  }
+
   if (instance.state === 'LOCKED') {
     io.to(lobbyId).emit('question_locked', {
       instanceId: instance.id,
@@ -478,6 +488,10 @@ function handleStateChange(lobbyId: string, instance: QuestionInstanceState): vo
   }
 
   if (instance.state === 'CANCELLED') {
+    // Resume replay if question is cancelled
+    if (runtime?.mode === 'replay') {
+      runtime.resume?.();
+    }
     io.to(lobbyId).emit('question_cancelled', {
       instanceId: instance.id,
       reason: instance.cancelledReason,
