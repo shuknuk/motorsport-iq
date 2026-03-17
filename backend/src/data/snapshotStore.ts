@@ -29,6 +29,7 @@ interface DriverData {
 }
 
 const DEBUG_DRIVER_PROVENANCE = process.env.DEBUG_DRIVER_PROVENANCE === 'true';
+const HUD_SNAPSHOT_THROTTLE_MS = 1_000;
 
 function toTimestamp(value: string | null | undefined): number {
   if (!value) return 0;
@@ -57,6 +58,8 @@ export class SnapshotStore {
   private replaySpeed: number | null = null;
   private isReplayComplete = false;
   private client: OpenF1Client;
+  private hudSnapshotTimer: NodeJS.Timeout | null = null;
+  private lastHudSnapshotAt = 0;
 
   constructor(client: OpenF1Client, options: SnapshotStoreOptions = {}) {
     this.client = client;
@@ -74,6 +77,11 @@ export class SnapshotStore {
     this.isReplayComplete = false;
     this.sessionMode = config?.sessionMode ?? 'live';
     this.replaySpeed = config?.replaySpeed ?? null;
+    this.lastHudSnapshotAt = 0;
+    if (this.hudSnapshotTimer) {
+      clearTimeout(this.hudSnapshotTimer);
+      this.hudSnapshotTimer = null;
+    }
 
     const driverData = await this.client.getDrivers();
     if (driverData) {
@@ -142,6 +150,7 @@ export class SnapshotStore {
         driverData.latestPosition = pos;
       }
     }
+    this.scheduleHudSnapshotUpdate();
   }
 
   processIntervalUpdate(intervals: OpenF1Interval[]): void {
@@ -157,6 +166,7 @@ export class SnapshotStore {
         driverData.latestInterval = interval;
       }
     }
+    this.scheduleHudSnapshotUpdate();
   }
 
   processPitUpdate(pits: OpenF1Pit[]): void {
@@ -169,6 +179,7 @@ export class SnapshotStore {
         }
       }
     }
+    this.scheduleHudSnapshotUpdate();
   }
 
   processStintUpdate(stints: OpenF1Stint[]): void {
@@ -201,6 +212,7 @@ export class SnapshotStore {
         driverData.latestStint = stint;
       }
     }
+    this.scheduleHudSnapshotUpdate();
   }
 
   processRaceControlUpdate(messages: OpenF1RaceControl[]): void {
@@ -269,8 +281,18 @@ export class SnapshotStore {
       });
     }
 
-    driverStates.sort((a, b) => a.position - b.position);
-    const leader = driverStates[0];
+    const normalizedPosition = (value: number): number => (value > 0 ? value : Number.MAX_SAFE_INTEGER);
+
+    driverStates.sort((a, b) => normalizedPosition(a.position) - normalizedPosition(b.position));
+    const previousLeaderDriverNumber = this.previousSnapshot?.drivers.find((driver) => driver.position > 0)?.driverNumber;
+    const leader = driverStates.find((driver) => driver.position > 0)
+      ?? (previousLeaderDriverNumber
+        ? driverStates.find((driver) => driver.driverNumber === previousLeaderDriverNumber)
+        : null)
+      ?? driverStates[0];
+    const orderedDrivers = leader
+      ? [leader, ...driverStates.filter((driver) => driver.driverNumber !== leader.driverNumber)]
+      : driverStates;
 
     this.currentSnapshot = {
       sessionId: this.sessionId,
@@ -280,7 +302,7 @@ export class SnapshotStore {
       sessionMode: this.sessionMode,
       replaySpeed: this.replaySpeed,
       isReplayComplete: this.isReplayComplete,
-      drivers: driverStates,
+      drivers: orderedDrivers,
       timestamp: new Date(),
       dataFeedStalled: false,
       leaderLapTime: leader?.lastLapTime ?? null,
@@ -295,6 +317,29 @@ export class SnapshotStore {
     }
 
     this.options.onSnapshotUpdate?.(this.currentSnapshot);
+    this.lastHudSnapshotAt = Date.now();
+  }
+
+  private scheduleHudSnapshotUpdate(): void {
+    if (!this.currentSnapshot || !this.sessionId) {
+      return;
+    }
+
+    const elapsed = Date.now() - this.lastHudSnapshotAt;
+    if (elapsed >= HUD_SNAPSHOT_THROTTLE_MS && !this.hudSnapshotTimer) {
+      this.buildSnapshot();
+      return;
+    }
+
+    if (this.hudSnapshotTimer) {
+      return;
+    }
+
+    const waitMs = Math.max(0, HUD_SNAPSHOT_THROTTLE_MS - elapsed);
+    this.hudSnapshotTimer = setTimeout(() => {
+      this.hudSnapshotTimer = null;
+      this.buildSnapshot();
+    }, waitMs);
   }
 
   private calculateTyreAge(data: DriverData): number {

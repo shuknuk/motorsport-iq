@@ -158,12 +158,10 @@ export async function startQuestionLifecycle(
     if (instance.state !== 'TRIGGERED') return;
 
     instance.state = 'LIVE';
-    await updateQuestionState(instance.id, 'LIVE');
-    onStateChange({ ...instance });
-
-    // Set answer deadline
     const deadline = new Date(Date.now() + ANSWER_WINDOW_MS);
     answerDeadlines.set(instance.id, deadline);
+    await updateQuestionState(instance.id, 'LIVE');
+    onStateChange({ ...instance });
 
     // LIVE -> LOCKED (after answer window)
     const timer = scheduleLobbyTimer(instance.lobbyId, async () => {

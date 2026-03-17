@@ -124,6 +124,18 @@ export interface QuestionEvent {
   suggestedStatKeys?: StatHintKey[];
 }
 
+export interface QuestionStateEvent {
+  instanceId: string;
+  state: QuestionState;
+  cancelledReason?: string;
+  answerDeadline?: string;
+}
+
+export interface ServerErrorEvent {
+  message: string;
+  code?: 'SESSION_EXPIRED' | 'TRANSIENT_CONNECTION' | 'VALIDATION_ERROR' | 'UNKNOWN';
+}
+
 export interface ResolutionEvent {
   instanceId: string;
   questionId: string;

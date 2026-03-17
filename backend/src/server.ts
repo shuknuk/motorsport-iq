@@ -12,6 +12,7 @@ import type {
   QuestionInstanceState,
   RaceSnapshot,
   RaceSnapshotEvent,
+  ServerErrorEvent,
 } from './types';
 import {
   createLobby,
@@ -24,12 +25,15 @@ import {
   updatePlayerConnection,
   removePlayer,
   getUserLobby,
+  getUserLobbyFromDatabase,
+  registerUserLobby,
   touchUserActivity,
 } from './lobby/lobbyManager';
 import {
   startQuestionLifecycle,
   submitAnswer,
   getActiveQuestion,
+  getAnswerDeadline,
   checkForResolution,
   resumeQuestion,
   clearAllTimers,
@@ -124,6 +128,14 @@ const io = new Server(httpServer, {
 });
 
 const PORT = process.env.PORT || 4000;
+
+function emitSocketError(
+  socket: { emit: (event: string, payload: ServerErrorEvent) => void },
+  message: string,
+  code: ServerErrorEvent['code'] = 'UNKNOWN'
+): void {
+  socket.emit('error', { message, code });
+}
 
 function toRaceSnapshotEvent(snapshot: RaceSnapshot): RaceSnapshotEvent {
   const leader = snapshot.drivers[0] ?? null;
@@ -448,10 +460,15 @@ async function checkAndResolveQuestion(lobbyId: string, snapshot: RaceSnapshot):
  * Handle question state change
  */
 function handleStateChange(lobbyId: string, instance: QuestionInstanceState): void {
+  const answerDeadline = instance.state === 'LIVE'
+    ? getAnswerDeadline(instance.id)?.toISOString()
+    : undefined;
+
   io.to(lobbyId).emit('question_state', {
     instanceId: instance.id,
     state: instance.state,
     cancelledReason: instance.cancelledReason,
+    answerDeadline,
   });
 
   if (instance.state === 'LOCKED') {
@@ -551,7 +568,7 @@ io.on('connection', (socket) => {
 
       console.log(`Lobby created: ${lobby.code} by ${data.username}`);
     } catch (error) {
-      socket.emit('error', { message: (error as Error).message });
+      emitSocketError(socket, (error as Error).message);
     }
   });
 
@@ -579,7 +596,7 @@ io.on('connection', (socket) => {
 
       console.log(`${data.username} joined lobby ${lobby.code}`);
     } catch (error) {
-      socket.emit('error', { message: (error as Error).message });
+      emitSocketError(socket, (error as Error).message);
     }
   });
 
@@ -641,7 +658,7 @@ io.on('connection', (socket) => {
 
       console.log(`Session ${data.sessionId} started for lobby ${lobbyState.code}`);
     } catch (error) {
-      socket.emit('error', { message: (error as Error).message });
+      emitSocketError(socket, (error as Error).message);
     }
   });
 
@@ -661,10 +678,10 @@ io.on('connection', (socket) => {
       if (result.success) {
         socket.emit('answer_received', { instanceId: data.instanceId });
       } else {
-        socket.emit('error', { message: result.error });
+        emitSocketError(socket, result.error ?? 'Failed to submit answer', 'VALIDATION_ERROR');
       }
     } catch (error) {
-      socket.emit('error', { message: (error as Error).message });
+      emitSocketError(socket, (error as Error).message);
     }
   });
 
@@ -673,18 +690,21 @@ io.on('connection', (socket) => {
    */
   socket.on('reconnect_lobby', async (data: { userId: string }) => {
     try {
-      const lobbyId = getUserLobby(data.userId);
+      const lobbyId = getUserLobby(data.userId) ?? await getUserLobbyFromDatabase(data.userId);
       if (!lobbyId) {
-        throw new Error('User not in any lobby');
+        emitSocketError(socket, 'Session expired. You are no longer in a lobby.', 'SESSION_EXPIRED');
+        return;
       }
 
       const lobbyState = await getLobbyState(lobbyId);
       if (!lobbyState) {
-        throw new Error('Lobby not found');
+        emitSocketError(socket, 'Session expired. Lobby no longer exists.', 'SESSION_EXPIRED');
+        return;
       }
 
       currentUserId = data.userId;
       currentLobbyId = lobbyId;
+      registerUserLobby(data.userId, lobbyId);
 
       socket.join(lobbyId);
       updatePlayerConnection(data.userId, true);
@@ -712,7 +732,10 @@ io.on('connection', (socket) => {
           activeQuestion,
           getQuestionCategory(activeQuestion.questionId),
           getQuestionDifficulty(activeQuestion.questionId),
-          { includeState: true }
+          {
+            includeState: true,
+            answerDeadline: activeQuestion.state === 'LIVE' ? getAnswerDeadline(activeQuestion.id) : null,
+          }
         ));
 
         if (activeQuestion.state !== 'LIVE') {
@@ -730,7 +753,7 @@ io.on('connection', (socket) => {
 
       console.log(`User ${data.userId} reconnected to lobby ${lobbyId}`);
     } catch (error) {
-      socket.emit('error', { message: (error as Error).message });
+      emitSocketError(socket, (error as Error).message);
     }
   });
 
@@ -757,7 +780,7 @@ io.on('connection', (socket) => {
         .map((session) => toSessionInfo(session));
       socket.emit('sessions_list', supportedSessions);
     } catch (error) {
-      socket.emit('error', { message: 'Failed to fetch sessions' });
+      emitSocketError(socket, 'Failed to fetch sessions');
     }
   });
 

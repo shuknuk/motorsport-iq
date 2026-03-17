@@ -101,6 +101,14 @@ function createStint(overrides: Partial<OpenF1Stint> = {}): OpenF1Stint {
 }
 
 describe('SnapshotStore race control updates', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('rebuilds and emits the snapshot immediately when track status changes', async () => {
     const onSnapshotUpdate = jest.fn();
     const parseTrackStatus = jest.fn(() => 'YELLOW' as const);
@@ -167,5 +175,51 @@ describe('SnapshotStore race control updates', () => {
     expect(leader?.gap).toBe(1.2);
     expect(leader?.interval).toBe(0.8);
     expect(leader?.tyreCompound).toBe('MEDIUM');
+  });
+
+  it('emits HUD snapshot updates on telemetry changes with a 1s throttle', async () => {
+    const onSnapshotUpdate = jest.fn();
+    const client = {
+      getDrivers: jest.fn(async () => [createDriver()]),
+      parseTrackStatus: jest.fn(() => 'GREEN' as const),
+    } as any;
+
+    const store = new SnapshotStore(client, { onSnapshotUpdate });
+    await store.initialize(1001, { sessionMode: 'replay', replaySpeed: 10 });
+    store.processLapCompletion(createLap());
+    onSnapshotUpdate.mockClear();
+
+    store.processPositionUpdate([createPosition({ date: '2025-09-01T13:06:00Z', position: 2 })]);
+    expect(onSnapshotUpdate).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(onSnapshotUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the previous known leader when incoming position telemetry is 0', async () => {
+    const client = {
+      getDrivers: jest.fn(async () => [
+        createDriver({ driver_number: 1, full_name: 'Driver One', broadcast_name: 'ONE' }),
+        createDriver({ driver_number: 2, full_name: 'Driver Two', broadcast_name: 'TWO' }),
+      ]),
+      parseTrackStatus: jest.fn(() => 'GREEN' as const),
+    } as any;
+
+    const store = new SnapshotStore(client);
+    await store.initialize(1001, { sessionMode: 'replay', replaySpeed: 10 });
+
+    store.processPositionUpdate([
+      createPosition({ driver_number: 1, position: 2, date: '2025-09-01T13:05:00Z' }),
+      createPosition({ driver_number: 2, position: 1, date: '2025-09-01T13:05:00Z' }),
+    ]);
+    store.processLapCompletion(createLap({ driver_number: 1, lap_number: 1 }));
+
+    store.processPositionUpdate([
+      createPosition({ driver_number: 1, position: 0, date: '2025-09-01T13:06:00Z' }),
+      createPosition({ driver_number: 2, position: 0, date: '2025-09-01T13:06:00Z' }),
+    ]);
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    expect(store.getCurrentSnapshot()?.drivers[0]?.name).toBe('Driver Two');
   });
 });

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSocketClient } from '@/lib/socket';
-import { SERVER_EVENTS, type LobbyState, type SessionInfo } from '@/lib/types';
+import { SERVER_EVENTS, type LobbyState, type ServerErrorEvent, type SessionInfo } from '@/lib/types';
 import { Button, Card, SectionLabel, ThemeToggle } from '@/components/ui';
 
 export default function LobbyPage() {
@@ -95,7 +95,18 @@ export default function LobbyPage() {
           });
         }
       }),
-      socket.on(SERVER_EVENTS.ERROR, ({ message }: { message: string }) => {
+      socket.on(SERVER_EVENTS.ERROR, ({ message, code }: ServerErrorEvent) => {
+        const isSessionExpired = code === 'SESSION_EXPIRED'
+          || message.toLowerCase().includes('user not in any lobby')
+          || message.toLowerCase().includes('user not found')
+          || message.toLowerCase().includes('session expired');
+
+        if (isSessionExpired) {
+          localStorage.removeItem('msp_user_id');
+          router.push('/');
+          return;
+        }
+
         setError(message);
         setIsStarting(false);
       }),

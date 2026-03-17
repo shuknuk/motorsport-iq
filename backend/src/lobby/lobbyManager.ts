@@ -512,6 +512,35 @@ export function getUserLobby(userId: string): string | null {
   return userLobbies.get(userId) ?? null;
 }
 
+export function registerUserLobby(userId: string, lobbyId: string): void {
+  userLobbies.set(userId, lobbyId);
+}
+
+export async function getUserLobbyFromDatabase(userId: string): Promise<string | null> {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('lobby_id')
+    .eq('id', userId)
+    .single();
+
+  if (error || !user?.lobby_id) {
+    return null;
+  }
+
+  const { data: lobby, error: lobbyError } = await supabase
+    .from('lobbies')
+    .select('id')
+    .eq('id', user.lobby_id)
+    .single();
+
+  if (lobbyError || !lobby) {
+    return null;
+  }
+
+  userLobbies.set(userId, lobby.id);
+  return lobby.id;
+}
+
 /**
  * Update leaderboard in cache
  */

@@ -55,4 +55,16 @@ describe('questionPayload', () => {
     expect(payload.questionText).toBe('Will the leader pit this lap?');
     expect(payload.suggestedStatKeys).toEqual(['TRACK_STATUS']);
   });
+
+  it('uses the provided live answer deadline when present', () => {
+    const answerDeadline = new Date('2025-01-01T00:00:25.000Z');
+    const payload = buildQuestionEventPayload(
+      createInstance('LIVE'),
+      'GAP_CLOSING',
+      'MEDIUM',
+      { includeState: true, answerDeadline }
+    );
+
+    expect(payload.answerDeadline).toBe(answerDeadline.toISOString());
+  });
 });

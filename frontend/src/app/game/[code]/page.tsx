@@ -18,9 +18,11 @@ import {
   type LobbyState,
   type ProblemReportReason,
   type QuestionEvent,
+  type QuestionStateEvent,
   type QuestionState,
   type RaceSnapshotEvent,
   type ResolutionEvent,
+  type ServerErrorEvent,
   type StatHintKey,
 } from '@/lib/types';
 import { Button, Card, SectionLabel, ThemeToggle } from '@/components/ui';
@@ -97,7 +99,19 @@ export default function GamePage() {
     }
   });
 
-  const handleSocketError = useEffectEvent(({ message }: { message: string }) => {
+  const handleSocketError = useEffectEvent(({ message, code }: ServerErrorEvent) => {
+    const isSessionExpired = code === 'SESSION_EXPIRED'
+      || message.toLowerCase().includes('user not in any lobby')
+      || message.toLowerCase().includes('user not found')
+      || message.toLowerCase().includes('session expired');
+
+    if (isSessionExpired) {
+      localStorage.removeItem('msp_user_id');
+      setConnectionNotice('Session expired. Redirecting to lobby join.');
+      router.push('/');
+      return;
+    }
+
     if (isProcessingAnswer && currentQuestion) {
       setSubmittedAnswers((current) => {
         const next = { ...current };
@@ -159,8 +173,20 @@ export default function GamePage() {
       }),
       socket.on(
         SERVER_EVENTS.QUESTION_STATE,
-        (data: { instanceId: string; state: QuestionState; cancelledReason?: string }) => {
+        (data: QuestionStateEvent) => {
           setQuestionState(data.state);
+          if (data.answerDeadline) {
+            setCurrentQuestion((current) => {
+              if (!current || current.instanceId !== data.instanceId) {
+                return current;
+              }
+
+              return {
+                ...current,
+                answerDeadline: data.answerDeadline ?? current.answerDeadline,
+              };
+            });
+          }
           if (data.state !== 'LIVE') {
             setIsProcessingAnswer(false);
           }

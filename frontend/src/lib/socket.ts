@@ -6,9 +6,11 @@ import type {
   LobbyState,
   PresenceExpiryReason,
   QuestionEvent,
+  QuestionStateEvent,
   ResolutionEvent,
   LeaderboardEntry,
   RaceSnapshotEvent,
+  ServerErrorEvent,
   SessionInfo,
 } from './types';
 import { SERVER_EVENTS, CLIENT_EVENTS } from './types';
@@ -65,9 +67,19 @@ class SocketClient {
     });
 
     this.socket.on('connect_error', (error: Error & { description?: unknown }) => {
+      if (this.socket?.connected) {
+        return;
+      }
+
       const details = typeof error.description === 'string'
         ? error.description
         : error.message;
+      const normalizedDetails = details.toLowerCase();
+
+      if (normalizedDetails.includes('websocket') || normalizedDetails.includes('transport')) {
+        this.emit('reconnecting', { reason: 'transport_upgrade_failed' });
+        return;
+      }
 
       this.lastError = {
         message: details
@@ -95,7 +107,7 @@ class SocketClient {
       this.emit(SERVER_EVENTS.QUESTION_EVENT, event);
     });
 
-    this.socket.on(SERVER_EVENTS.QUESTION_STATE, (data: { instanceId: string; state: string; cancelledReason?: string }) => {
+    this.socket.on(SERVER_EVENTS.QUESTION_STATE, (data: QuestionStateEvent) => {
       this.emit(SERVER_EVENTS.QUESTION_STATE, data);
     });
 
@@ -151,7 +163,7 @@ class SocketClient {
       this.emit(SERVER_EVENTS.PRESENCE_EXPIRED, data);
     });
 
-    this.socket.on(SERVER_EVENTS.ERROR, (error: { message: string }) => {
+    this.socket.on(SERVER_EVENTS.ERROR, (error: ServerErrorEvent) => {
       this.lastError = error;
       this.emit(SERVER_EVENTS.ERROR, error);
     });
