@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { cn } from '@/lib/cn';
 
 interface LapProgressBarProps {
@@ -12,12 +12,11 @@ interface LapProgressBarProps {
   highlighted?: boolean;
 }
 
-function calculateProgress(timestamp: string, leaderLapTime: number | null): number {
+function calculateProgress(lapStartTime: number, leaderLapTime: number | null): number {
   if (!leaderLapTime || leaderLapTime <= 0) {
     return 0;
   }
 
-  const lapStartTime = new Date(timestamp).getTime();
   const elapsedMs = Math.max(0, Date.now() - lapStartTime);
   const lapDurationMs = leaderLapTime * 1000;
 
@@ -32,8 +31,20 @@ export default function LapProgressBar({
   raceCompleted,
   highlighted = false,
 }: LapProgressBarProps) {
+  // Track lap start time based on lap number changes, not timestamp updates
+  const lapStartTimeRef = useRef<number>(Date.now());
+  const previousLapNumberRef = useRef<number>(lapNumber);
+
+  useEffect(() => {
+    // Only update lap start time when lap number actually changes
+    if (lapNumber !== previousLapNumberRef.current) {
+      lapStartTimeRef.current = Date.now();
+      previousLapNumberRef.current = lapNumber;
+    }
+  }, [lapNumber]);
+
   const [progress, setProgress] = useState(() => (
-    raceCompleted ? 100 : calculateProgress(timestamp, leaderLapTime)
+    raceCompleted ? 100 : calculateProgress(lapStartTimeRef.current, leaderLapTime)
   ));
 
   useEffect(() => {
@@ -42,13 +53,13 @@ export default function LapProgressBar({
       return;
     }
 
-    setProgress(calculateProgress(timestamp, leaderLapTime));
+    setProgress(calculateProgress(lapStartTimeRef.current, leaderLapTime));
     const interval = window.setInterval(() => {
-      setProgress(calculateProgress(timestamp, leaderLapTime));
+      setProgress(calculateProgress(lapStartTimeRef.current, leaderLapTime));
     }, 250);
 
     return () => window.clearInterval(interval);
-  }, [leaderLapTime, raceCompleted, timestamp]);
+  }, [leaderLapTime, raceCompleted]);
 
   return (
     <div

@@ -65,7 +65,9 @@ export default function TireStats({ leaderStats, highlighted = false }: TireStat
         </div>
         <div className="border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-3 text-center">
           <p className="font-display text-xs uppercase tracking-[0.16em] text-[var(--color-muted-fg)]">Stint</p>
-          <p className="mt-2 font-display text-3xl leading-none">{leaderStats?.stintNumber ?? '-'}</p>
+          <p className="mt-2 font-display text-3xl leading-none">
+            {leaderStats?.stintNumber !== null && leaderStats?.stintNumber !== undefined ? leaderStats.stintNumber : '-'}
+          </p>
           <p className="mt-1 font-display text-[10px] uppercase tracking-[0.16em] text-[var(--color-muted-fg)]">current run</p>
         </div>
       </div>

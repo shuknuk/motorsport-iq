@@ -77,6 +77,11 @@ export default function GamePage() {
         ? question.triggeredAt
         : new Date(question.triggeredAt).toISOString();
 
+      // The server transitions: TRIGGERED (1s) -> LIVE (20s) -> LOCKED
+      // The 20-second answer window starts when state becomes LIVE
+      // triggeredAt + 1s = when LIVE starts, + 20s = when it locks
+      const answerDeadline = new Date(new Date(triggeredAt).getTime() + 21_000).toISOString();
+
       return {
         instanceId: question.id,
         questionId: question.questionId,
@@ -85,7 +90,7 @@ export default function GamePage() {
         difficulty: fallbackDifficulty,
         windowSize: question.windowSize,
         triggeredAt,
-        answerDeadline: new Date(new Date(triggeredAt).getTime() + 20_000).toISOString(),
+        answerDeadline,
         state: question.state,
         suggestedStatKeys: question.suggestedStatKeys ?? previous?.suggestedStatKeys ?? [],
       };
@@ -159,7 +164,14 @@ export default function GamePage() {
         }
       }),
       socket.on(SERVER_EVENTS.QUESTION_EVENT, (event: QuestionEvent) => {
-        setCurrentQuestion(event);
+        // Ensure answerDeadline accounts for the 1s TRIGGERED delay + 20s LIVE window
+        const triggeredAt = new Date(event.triggeredAt).getTime();
+        const correctDeadline = new Date(triggeredAt + 21_000).toISOString();
+
+        setCurrentQuestion({
+          ...event,
+          answerDeadline: correctDeadline,
+        });
         setQuestionState(event.state ?? 'LIVE');
         setResolution(null);
         setIsProcessingAnswer(false);
