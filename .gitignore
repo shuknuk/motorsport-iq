@@ -141,3 +141,5 @@ vite.config.ts.timestamp-*
 
 # MCP Protocol
 .mcp.json
+.vercel
+.env*.local
