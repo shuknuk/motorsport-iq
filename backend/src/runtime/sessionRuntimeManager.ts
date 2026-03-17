@@ -62,6 +62,7 @@ abstract class BaseRuntime implements SessionRuntime {
       onPositionUpdate: (positions) => this.snapshotStore.processPositionUpdate(positions),
       onIntervalUpdate: (intervals) => this.snapshotStore.processIntervalUpdate(intervals),
       onPitUpdate: (pits) => this.snapshotStore.processPitUpdate(pits),
+      onStintUpdate: (stints) => this.snapshotStore.processStintUpdate(stints),
       onRaceControlUpdate: (messages) => this.snapshotStore.processRaceControlUpdate(messages),
       onFeedStall: (stalled) => {
         this.snapshotStore.handleFeedStall(stalled);
@@ -159,10 +160,12 @@ class ReplaySessionRuntime extends BaseRuntime {
     const positions = await this.client.fetchPositions();
     const intervals = await this.client.fetchIntervals();
     const pits = await this.client.fetchPits();
+    const stints = await this.client.fetchStints();
     const raceControl = await this.client.fetchRaceControl();
     const totalLaps = (laps ?? []).reduce((maxLap, lap) => Math.max(maxLap, lap.lap_number), 0);
 
     this.snapshotStore.setTotalLaps(totalLaps > 0 ? totalLaps : null);
+    this.snapshotStore.processStintUpdate(stints ?? []);
 
     this.events = buildReplayTimeline({
       laps: laps ?? [],

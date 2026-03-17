@@ -1,6 +1,6 @@
 // Socket.io event types for the frontend
 
-export type TrackStatus = 'GREEN' | 'SC' | 'VSC' | 'RED';
+export type TrackStatus = 'GREEN' | 'YELLOW' | 'SC' | 'VSC' | 'RED' | 'CHEQUERED';
 export type SessionMode = 'live' | 'replay';
 export type QuestionCategory = 'OVERTAKE' | 'PIT_WINDOW' | 'GAP_CLOSING' | 'FINISH_POSITION';
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
@@ -12,6 +12,12 @@ export type ProblemReportReason =
   | 'TELEMETRY_MISMATCH'
   | 'OTHER';
 export type ProblemReportStatus = 'OPEN' | 'REVIEWED' | 'RESOLVED' | 'DISMISSED';
+export type StatHintKey =
+  | 'TRACK_STATUS'
+  | 'LAP_PROGRESS'
+  | 'TYRE_COMPOUND'
+  | 'TYRE_AGE'
+  | 'STINT_NUMBER';
 export type PresenceExpiryReason = 'inactive' | 'disconnected_timeout';
 
 export interface PlayerState {
@@ -50,6 +56,7 @@ export interface QuestionInstanceState {
   explanation?: string;
   questionText?: string;
   cancelledReason?: string;
+  suggestedStatKeys?: StatHintKey[];
 }
 
 export interface RaceSnapshot {
@@ -72,11 +79,20 @@ export interface DriverState {
   interval: number | null;
   tyreCompound: string | null;
   tyreAge: number;
+  stintNumber: number | null;
   drsEnabled: boolean;
   pitCount: number;
   lastLapTime: number | null;
   inPit: boolean;
   retired: boolean;
+}
+
+export interface LeaderStats {
+  name: string;
+  team: string;
+  tyreCompound: string | null;
+  tyreAge: number;
+  stintNumber: number | null;
 }
 
 export interface LobbyState {
@@ -104,6 +120,7 @@ export interface QuestionEvent {
   windowSize: number;
   triggeredAt: string;
   answerDeadline: string;
+  suggestedStatKeys?: StatHintKey[];
 }
 
 export interface ResolutionEvent {
@@ -157,11 +174,15 @@ export interface ScoreUpdate {
 export interface RaceSnapshotEvent {
   sessionId: string;
   lapNumber: number;
+  totalLaps: number | null;
   trackStatus: TrackStatus;
   sessionMode: SessionMode;
   replaySpeed: number | null;
   isReplayComplete: boolean;
+  timestamp: string;
+  leaderLapTime: number | null;
   leader: string;
+  leaderStats: LeaderStats | null;
   topThree: string[];
   dataFeedStalled: boolean;
 }

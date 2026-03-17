@@ -30,6 +30,18 @@ export const POINTS_NO_ANSWER = 0;
 export const STREAK_BONUS_3 = 5;
 export const STREAK_BONUS_5 = 10;
 
+export function dedupeAnswersByUser(answers: Answer[]): Answer[] {
+  const uniqueAnswers = new Map<string, Answer>();
+
+  for (const answer of answers) {
+    if (!uniqueAnswers.has(answer.user_id)) {
+      uniqueAnswers.set(answer.user_id, answer);
+    }
+  }
+
+  return [...uniqueAnswers.values()];
+}
+
 /**
  * Calculate score for a single answer
  */
@@ -142,7 +154,7 @@ export function processQuestionResults(
 ): Map<string, ScoreResult> {
   const results = new Map<string, ScoreResult>();
 
-  for (const answer of answers) {
+  for (const answer of dedupeAnswersByUser(answers)) {
     const entry = leaderboardEntries.get(answer.user_id) ?? null;
     const currentStreak = entry?.streak ?? 0;
 

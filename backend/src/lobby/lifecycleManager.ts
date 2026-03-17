@@ -6,7 +6,7 @@ import supabase from '../db/supabaseClient';
 import { getLobbyState, setCurrentQuestion, incrementQuestionCount, updateLeaderboardCache } from './lobbyManager';
 import { resolveQuestion, shouldCancel, shouldPause, shouldResume, shouldResolve } from '../engine/resolutionEngine';
 import { recordResolution } from '../engine/questionEngine';
-import { calculateScore } from '../engine/scoringEngine';
+import { calculateScore, dedupeAnswersByUser, updateLeaderboardEntry } from '../engine/scoringEngine';
 import { getQuestionById } from '../engine/questionBank';
 import { generateResolutionExplanation } from '../ai/explanationGenerator';
 
@@ -42,6 +42,7 @@ const activeQuestions: Map<string, QuestionInstanceState> = new Map();
 
 // Paused questions (SC/VSC)
 const pausedQuestions: Map<string, QuestionInstanceState> = new Map();
+const scoredQuestionInstances: Set<string> = new Set();
 
 function trackLobbyTimer(lobbyId: string, timer: NodeJS.Timeout): void {
   const timers = lobbyTimers.get(lobbyId) ?? new Set<NodeJS.Timeout>();
@@ -388,6 +389,10 @@ async function processAnswers(
   instance: QuestionInstanceState,
   correctAnswer: 'YES' | 'NO'
 ): Promise<void> {
+  if (scoredQuestionInstances.has(instance.id)) {
+    return;
+  }
+
   // Fetch all answers for this question
   const { data: answers, error } = await supabase
     .from('answers')
@@ -396,37 +401,66 @@ async function processAnswers(
 
   if (error || !answers) return;
 
-  // Process each answer
-  for (const answer of answers) {
-    // Calculate score
+  scoredQuestionInstances.add(instance.id);
+
+  try {
     const lobbyState = await getLobbyState(instance.lobbyId);
-    const leaderboardEntry = lobbyState?.leaderboard.find((lb) => lb.userId === answer.user_id);
-    const currentStreak = leaderboardEntry?.streak ?? 0;
+    if (!lobbyState) {
+      return;
+    }
 
-    const scoreResult = calculateScore(answer.answer, correctAnswer, currentStreak);
+    // Process each answer exactly once per user.
+    for (const answer of dedupeAnswersByUser(answers)) {
+      const leaderboardEntry = lobbyState.leaderboard.find((lb) => lb.userId === answer.user_id);
+      const currentEntry = leaderboardEntry
+        ? {
+            id: '',
+            lobby_id: instance.lobbyId,
+            user_id: answer.user_id,
+            points: leaderboardEntry.points,
+            streak: leaderboardEntry.streak,
+            max_streak: leaderboardEntry.maxStreak,
+            correct_answers: leaderboardEntry.correctAnswers,
+            wrong_answers: leaderboardEntry.wrongAnswers,
+            questions_answered: leaderboardEntry.questionsAnswered,
+            accuracy: leaderboardEntry.accuracy,
+            updated_at: new Date().toISOString(),
+          }
+        : null;
 
-    // Update leaderboard in database using the stored procedure
-    await supabase.rpc('update_leaderboard', {
-      p_lobby_id: instance.lobbyId,
-      p_user_id: answer.user_id,
-      p_points_change: scoreResult.pointsChange,
-      p_is_correct: scoreResult.isCorrect,
-    });
+      const scoreResult = calculateScore(answer.answer, correctAnswer, currentEntry?.streak ?? 0);
+      const updatedEntry = updateLeaderboardEntry(
+        currentEntry,
+        answer.user_id,
+        instance.lobbyId,
+        scoreResult
+      );
 
-    // Update cache
-    const user = lobbyState?.players.find((p) => p.id === answer.user_id);
-    updateLeaderboardCache(instance.lobbyId, answer.user_id, {
-      username: user?.username ?? '',
-      points: (leaderboardEntry?.points ?? 0) + scoreResult.pointsChange,
-      streak: scoreResult.newStreak,
-      maxStreak: Math.max(leaderboardEntry?.maxStreak ?? 0, scoreResult.newStreak),
-      correctAnswers: (leaderboardEntry?.correctAnswers ?? 0) + (scoreResult.isCorrect ? 1 : 0),
-      wrongAnswers: (leaderboardEntry?.wrongAnswers ?? 0) + (scoreResult.isCorrect ? 0 : 1),
-      questionsAnswered: (leaderboardEntry?.questionsAnswered ?? 0) + 1,
-      accuracy: scoreResult.isCorrect
-        ? ((leaderboardEntry?.correctAnswers ?? 0) + 1) / ((leaderboardEntry?.questionsAnswered ?? 0) + 1) * 100
-        : (leaderboardEntry?.correctAnswers ?? 0) / ((leaderboardEntry?.questionsAnswered ?? 0) + 1) * 100,
-    });
+      // Update leaderboard in database using the stored procedure
+      await supabase.rpc('update_leaderboard', {
+        p_lobby_id: instance.lobbyId,
+        p_user_id: answer.user_id,
+        p_points_change: scoreResult.pointsChange,
+        p_is_correct: scoreResult.isCorrect,
+      });
+
+      const user = lobbyState.players.find((player) => player.id === answer.user_id);
+
+      // Keep the in-memory cache in sync with the single score application above.
+      updateLeaderboardCache(instance.lobbyId, answer.user_id, {
+        username: user?.username ?? leaderboardEntry?.username ?? '',
+        points: updatedEntry.points,
+        streak: updatedEntry.streak,
+        maxStreak: updatedEntry.max_streak,
+        correctAnswers: updatedEntry.correct_answers,
+        wrongAnswers: updatedEntry.wrong_answers,
+        questionsAnswered: updatedEntry.questions_answered,
+        accuracy: updatedEntry.accuracy,
+      });
+    }
+  } catch (processingError) {
+    scoredQuestionInstances.delete(instance.id);
+    throw processingError;
   }
 }
 

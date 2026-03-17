@@ -4,7 +4,13 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import supabase from './db/supabaseClient';
-import type { CreateProblemReportInput, ProblemReportStatus, QuestionInstanceState, RaceSnapshot } from './types';
+import type {
+  CreateProblemReportInput,
+  ProblemReportStatus,
+  QuestionInstanceState,
+  RaceSnapshot,
+  RaceSnapshotEvent,
+} from './types';
 import {
   createLobby,
   joinLobby,
@@ -45,6 +51,8 @@ import {
   listProblemReports,
   updateProblemReportStatus,
 } from './admin/reporting';
+import { generateSuggestedStatKeys } from './ai/statHintGenerator';
+import { getQuestionById } from './engine/questionBank';
 
 const app = express();
 const corsOptions = {
@@ -58,6 +66,34 @@ const io = new Server(httpServer, {
 });
 
 const PORT = process.env.PORT || 4000;
+
+function toRaceSnapshotEvent(snapshot: RaceSnapshot): RaceSnapshotEvent {
+  const leader = snapshot.drivers[0] ?? null;
+
+  return {
+    sessionId: snapshot.sessionId,
+    lapNumber: snapshot.lapNumber,
+    totalLaps: snapshot.totalLaps,
+    trackStatus: snapshot.trackStatus,
+    sessionMode: snapshot.sessionMode,
+    replaySpeed: snapshot.replaySpeed,
+    isReplayComplete: snapshot.isReplayComplete,
+    timestamp: snapshot.timestamp.toISOString(),
+    leaderLapTime: snapshot.leaderLapTime,
+    leader: leader?.name ?? '',
+    leaderStats: leader
+      ? {
+          name: leader.name,
+          team: leader.team,
+          tyreCompound: leader.tyreCompound,
+          tyreAge: leader.tyreAge,
+          stintNumber: leader.stintNumber,
+        }
+      : null,
+    topThree: snapshot.drivers.slice(0, 3).map((driver) => driver.name),
+    dataFeedStalled: snapshot.dataFeedStalled,
+  };
+}
 
 // Middleware
 app.use(cors(corsOptions));
@@ -214,17 +250,10 @@ const runtimeManager = new SessionRuntimeManager({
 
       const lobbyState = await getLobbyState(lobbyId);
       if (snapshot) {
-        io.to(lobbyId).emit('race_snapshot_update', {
-          sessionId: snapshot.sessionId,
-          lapNumber: snapshot.lapNumber,
-          trackStatus: snapshot.trackStatus,
-          sessionMode: snapshot.sessionMode,
-          replaySpeed: snapshot.replaySpeed,
+        io.to(lobbyId).emit('race_snapshot_update', toRaceSnapshotEvent({
+          ...snapshot,
           isReplayComplete: true,
-          leader: snapshot.drivers[0]?.name ?? '',
-          topThree: snapshot.drivers.slice(0, 3).map((driver) => driver.name),
-          dataFeedStalled: snapshot.dataFeedStalled,
-        });
+        }));
       }
       if (lobbyState) {
         io.to(lobbyId).emit('lobby_state', lobbyState);
@@ -314,6 +343,14 @@ async function checkAndTriggerQuestion(lobbyId: string, snapshot: RaceSnapshot):
     newQuestion.questionText = await generateQuestionText(newQuestion);
     setLatestResolution(lobbyId, null);
     console.log(`Triggering question ${newQuestion.questionId} for lobby ${lobbyId}`);
+    const suggestedStatKeys = newQuestion.questionText
+      ? await generateSuggestedStatKeys({
+          questionText: newQuestion.questionText,
+          category: getQuestionById(newQuestion.questionId)?.category ?? 'GAP_CLOSING',
+          snapshot,
+        })
+      : [];
+    newQuestion.suggestedStatKeys = suggestedStatKeys;
 
     // Broadcast question event
     io.to(lobbyId).emit('question_event', {
@@ -325,6 +362,7 @@ async function checkAndTriggerQuestion(lobbyId: string, snapshot: RaceSnapshot):
       windowSize: newQuestion.windowSize,
       triggeredAt: newQuestion.triggeredAt.toISOString(),
       answerDeadline: new Date(newQuestion.triggeredAt.getTime() + 20000).toISOString(),
+      suggestedStatKeys,
     });
 
     // Start lifecycle
@@ -410,17 +448,7 @@ async function handleResolution(
  */
 function broadcastRaceSnapshot(snapshot: RaceSnapshot, lobbyIds: Set<string>): void {
   for (const lobbyId of lobbyIds) {
-    io.to(lobbyId).emit('race_snapshot_update', {
-      sessionId: snapshot.sessionId,
-      lapNumber: snapshot.lapNumber,
-      trackStatus: snapshot.trackStatus,
-      sessionMode: snapshot.sessionMode,
-      replaySpeed: snapshot.replaySpeed,
-      isReplayComplete: snapshot.isReplayComplete,
-      leader: snapshot.drivers[0]?.name ?? '',
-      topThree: snapshot.drivers.slice(0, 3).map((d) => d.name),
-      dataFeedStalled: snapshot.dataFeedStalled,
-    });
+    io.to(lobbyId).emit('race_snapshot_update', toRaceSnapshotEvent(snapshot));
   }
 }
 
@@ -428,7 +456,6 @@ function broadcastRaceSnapshot(snapshot: RaceSnapshot, lobbyIds: Set<string>): v
  * Get question category
  */
 function getQuestionCategory(questionId: string): string {
-  const { getQuestionById } = require('./engine/questionBank');
   const question = getQuestionById(questionId);
   return question?.category ?? 'UNKNOWN';
 }
@@ -437,7 +464,6 @@ function getQuestionCategory(questionId: string): string {
  * Get question difficulty
  */
 function getQuestionDifficulty(questionId: string): string {
-  const { getQuestionById } = require('./engine/questionBank');
   const question = getQuestionById(questionId);
   return question?.difficulty ?? 'MEDIUM';
 }
@@ -617,34 +643,25 @@ io.on('connection', (socket) => {
       if (lobbyState.sessionId) {
         const snapshot = runtimeManager.getRuntimeForLobby(lobbyId)?.getCurrentSnapshot();
         if (snapshot) {
-          socket.emit('race_snapshot_update', {
-            sessionId: snapshot.sessionId,
-            lapNumber: snapshot.lapNumber,
-            trackStatus: snapshot.trackStatus,
-            sessionMode: snapshot.sessionMode,
-            replaySpeed: snapshot.replaySpeed,
-            isReplayComplete: snapshot.isReplayComplete,
-            leader: snapshot.drivers[0]?.name ?? '',
-            topThree: snapshot.drivers.slice(0, 3).map((driver) => driver.name),
-            dataFeedStalled: snapshot.dataFeedStalled,
-          });
+          socket.emit('race_snapshot_update', toRaceSnapshotEvent(snapshot));
         }
       }
 
       // Send active question if any
       const activeQuestion = getActiveQuestion(lobbyId);
       if (activeQuestion && activeQuestion.state === 'LIVE') {
-        socket.emit('question_event', {
-          instanceId: activeQuestion.id,
-          questionId: activeQuestion.questionId,
-          questionText: activeQuestion.questionText,
-          category: getQuestionCategory(activeQuestion.questionId),
-          difficulty: getQuestionDifficulty(activeQuestion.questionId),
-          windowSize: activeQuestion.windowSize,
-          triggeredAt: activeQuestion.triggeredAt.toISOString(),
-          answerDeadline: new Date(activeQuestion.triggeredAt.getTime() + 20000).toISOString(),
-        });
-      }
+      socket.emit('question_event', {
+        instanceId: activeQuestion.id,
+        questionId: activeQuestion.questionId,
+        questionText: activeQuestion.questionText,
+        category: getQuestionCategory(activeQuestion.questionId),
+        difficulty: getQuestionDifficulty(activeQuestion.questionId),
+        windowSize: activeQuestion.windowSize,
+        triggeredAt: activeQuestion.triggeredAt.toISOString(),
+        answerDeadline: new Date(activeQuestion.triggeredAt.getTime() + 20000).toISOString(),
+        suggestedStatKeys: activeQuestion.suggestedStatKeys ?? [],
+      });
+    }
 
       if (lobbyState.latestResolution) {
         socket.emit('resolution_event', lobbyState.latestResolution);

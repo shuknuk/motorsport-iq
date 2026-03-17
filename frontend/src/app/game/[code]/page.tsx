@@ -1,10 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import QuestionCard from '@/components/QuestionCard';
 import CountdownTimer from '@/components/CountdownTimer';
 import Leaderboard from '@/components/Leaderboard';
+import LapProgressBar from '@/components/LapProgressBar';
+import RaceConditionBadge from '@/components/RaceConditionBadge';
+import TireStats from '@/components/TireStats';
+import WinnerScreen from '@/components/WinnerScreen';
 import { getSocketClient } from '@/lib/socket';
 import { apiFetch } from '@/lib/api';
 import {
@@ -16,6 +20,7 @@ import {
   type QuestionEvent,
   type RaceSnapshotEvent,
   type ResolutionEvent,
+  type StatHintKey,
 } from '@/lib/types';
 import { Button, Card, SectionLabel, ThemeToggle } from '@/components/ui';
 
@@ -35,10 +40,13 @@ export default function GamePage() {
   const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<QuestionEvent | null>(null);
   const [questionState, setQuestionState] = useState<string | null>(null);
-  const [answer, setAnswer] = useState<'YES' | 'NO' | null>(null);
+  const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, 'YES' | 'NO'>>({});
+  const [isProcessingAnswer, setIsProcessingAnswer] = useState(false);
   const [resolution, setResolution] = useState<ResolutionEvent | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [raceSnapshot, setRaceSnapshot] = useState<RaceSnapshotEvent | null>(null);
+  const [raceCompletedLap, setRaceCompletedLap] = useState<number | null>(null);
+  const [suggestedStatKeys, setSuggestedStatKeys] = useState<StatHintKey[]>([]);
   const [feedStalled, setFeedStalled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState<ProblemReportReason>('WRONG_ANSWER');
@@ -49,6 +57,17 @@ export default function GamePage() {
   const [reportError, setReportError] = useState<string | null>(null);
 
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
+  const handleSocketError = useEffectEvent(({ message }: { message: string }) => {
+    if (isProcessingAnswer && currentQuestion) {
+      setSubmittedAnswers((current) => {
+        const next = { ...current };
+        delete next[currentQuestion.instanceId];
+        return next;
+      });
+      setIsProcessingAnswer(false);
+    }
+    setError(message);
+  });
 
   useEffect(() => {
     const socket = getSocketClient();
@@ -66,8 +85,9 @@ export default function GamePage() {
       socket.on(SERVER_EVENTS.QUESTION_EVENT, (event: QuestionEvent) => {
         setCurrentQuestion(event);
         setQuestionState('LIVE');
-        setAnswer(null);
         setResolution(null);
+        setIsProcessingAnswer(false);
+        setSuggestedStatKeys(event.suggestedStatKeys ?? []);
         setIsReportFormOpen(false);
         setIsSubmittingReport(false);
         setReportSuccess(false);
@@ -86,10 +106,13 @@ export default function GamePage() {
       ),
       socket.on(SERVER_EVENTS.QUESTION_LOCKED, () => {
         setQuestionState('LOCKED');
+        setIsProcessingAnswer(false);
       }),
       socket.on(SERVER_EVENTS.QUESTION_CANCELLED, (data: { instanceId: string; reason: string }) => {
         setCurrentQuestion(null);
         setResolution(null);
+        setIsProcessingAnswer(false);
+        setSuggestedStatKeys([]);
         setError(`Question cancelled: ${data.reason}`);
         setTimeout(() => setError(null), 5000);
       }),
@@ -97,6 +120,8 @@ export default function GamePage() {
         setResolution(event);
         setQuestionState('RESOLVED');
         setCurrentQuestion(null);
+        setIsProcessingAnswer(false);
+        setSuggestedStatKeys([]);
         setIsReportFormOpen(false);
         setIsSubmittingReport(false);
         setReportSuccess(false);
@@ -107,15 +132,16 @@ export default function GamePage() {
       socket.on(SERVER_EVENTS.LEADERBOARD_UPDATE, (entries: LeaderboardEntry[]) => {
         setLeaderboard(entries);
       }),
+      socket.on(SERVER_EVENTS.ANSWER_RECEIVED, () => {
+        setIsProcessingAnswer(false);
+      }),
       socket.on(SERVER_EVENTS.RACE_SNAPSHOT_UPDATE, (snapshot: RaceSnapshotEvent) => {
         setRaceSnapshot(snapshot);
       }),
       socket.on(SERVER_EVENTS.FEED_STATUS, ({ stalled }: { stalled: boolean }) => {
         setFeedStalled(stalled);
       }),
-      socket.on(SERVER_EVENTS.ERROR, ({ message }: { message: string }) => {
-        setError(message);
-      }),
+      socket.on(SERVER_EVENTS.ERROR, handleSocketError),
       socket.on(SERVER_EVENTS.PRESENCE_EXPIRED, () => {
         localStorage.removeItem('msp_user_id');
         router.push('/');
@@ -130,7 +156,7 @@ export default function GamePage() {
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [router]);
+  }, [handleSocketError, router]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -148,14 +174,32 @@ export default function GamePage() {
     };
   }, [currentUserId]);
 
+  useEffect(() => {
+    if (
+      raceSnapshot
+      && raceCompletedLap === null
+      && (
+        raceSnapshot.trackStatus === 'CHEQUERED'
+        || raceSnapshot.isReplayComplete
+        || (raceSnapshot.totalLaps !== null && raceSnapshot.lapNumber >= raceSnapshot.totalLaps)
+      )
+    ) {
+      setRaceCompletedLap(raceSnapshot.totalLaps ?? raceSnapshot.lapNumber);
+    }
+  }, [raceCompletedLap, raceSnapshot]);
+
   const handleSubmitAnswer = useCallback(
     (selectedAnswer: 'YES' | 'NO') => {
-      if (!currentQuestion || answer) return;
+      if (!currentQuestion || submittedAnswers[currentQuestion.instanceId]) return;
 
       getSocketClient().submitAnswer(currentQuestion.instanceId, selectedAnswer);
-      setAnswer(selectedAnswer);
+      setSubmittedAnswers((current) => ({
+        ...current,
+        [currentQuestion.instanceId]: selectedAnswer,
+      }));
+      setIsProcessingAnswer(true);
     },
-    [answer, currentQuestion]
+    [currentQuestion, submittedAnswers]
   );
 
   const handleSubmitReport = useCallback(async () => {
@@ -194,24 +238,22 @@ export default function GamePage() {
     }
   }, [currentUserId, isSubmittingReport, reportNote, reportReason, resolution]);
 
-  const getTrackStatusLabel = (status: string) => {
-    switch (status) {
-      case 'SC':
-        return 'Safety Car';
-      case 'VSC':
-        return 'Virtual SC';
-      case 'RED':
-        return 'Red Flag';
-      default:
-        return 'Green Flag';
-    }
-  };
-
   const handleLeaveSession = useCallback(() => {
     localStorage.removeItem('msp_user_id');
     getSocketClient().leaveLobby();
     router.push('/');
   }, [router]);
+
+  const currentSubmittedAnswer = currentQuestion
+    ? submittedAnswers[currentQuestion.instanceId] ?? null
+    : null;
+  const resolvedAnswer = resolution ? submittedAnswers[resolution.instanceId] ?? null : null;
+  const resolvedAnswerIsCorrect = resolvedAnswer !== null && resolvedAnswer === resolution?.correctAnswer;
+  const hasRaceCompleted = raceCompletedLap !== null;
+  const showWinnerScreen = hasRaceCompleted && !currentQuestion && lobbyState?.status === 'finished';
+  const tireStatsHighlighted = suggestedStatKeys.some((key) => (
+    key === 'TYRE_COMPOUND' || key === 'TYRE_AGE' || key === 'STINT_NUMBER'
+  ));
 
   if (!lobbyState) {
     return (
@@ -237,11 +279,14 @@ export default function GamePage() {
               {raceSnapshot && (
                 <>
                   <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
-                    Lap {raceSnapshot.lapNumber}
+                    {hasRaceCompleted
+                      ? `Lap ${raceCompletedLap}: Race Completed 🏁`
+                      : `Lap ${raceSnapshot.lapNumber}${raceSnapshot.totalLaps ? ` / ${raceSnapshot.totalLaps}` : ''}`}
                   </span>
-                  <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
-                    {getTrackStatusLabel(raceSnapshot.trackStatus)}
-                  </span>
+                  <RaceConditionBadge
+                    status={raceSnapshot.trackStatus}
+                    highlighted={suggestedStatKeys.includes('TRACK_STATUS')}
+                  />
                   <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
                     Leader {raceSnapshot.leader}
                   </span>
@@ -268,6 +313,16 @@ export default function GamePage() {
                 ? 'This session is running from OpenF1 historical telemetry at 10x speed. The server watches the replay for question-bank triggers, then Groq/Llama rewrites the prompt and explains each resolution.'
                 : 'This session follows live telemetry. Questions appear only when the server-side trigger engine finds a valid race situation.'}
             </p>
+            {raceSnapshot && (
+              <LapProgressBar
+                lapNumber={raceSnapshot.lapNumber}
+                totalLaps={raceSnapshot.totalLaps}
+                timestamp={raceSnapshot.timestamp}
+                leaderLapTime={raceSnapshot.leaderLapTime}
+                raceCompleted={hasRaceCompleted}
+                highlighted={suggestedStatKeys.includes('LAP_PROGRESS')}
+              />
+            )}
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
             <ThemeToggle />
@@ -279,8 +334,15 @@ export default function GamePage() {
 
         <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
           <div>
+            {showWinnerScreen && (
+              <WinnerScreen
+                entries={leaderboard}
+                onBackToLobby={() => router.push(`/lobby/${lobbyCode}`)}
+              />
+            )}
+
             {currentQuestion && questionState === 'LIVE' && (
-              <Card tone="muted" className="swiss-grid-pattern p-6 md:p-8">
+              <Card tone="muted" className="swiss-grid-pattern relative p-6 md:p-8">
                 <div className="mb-6 flex justify-center">
                   <CountdownTimer deadline={currentQuestion.answerDeadline} size="lg" />
                 </div>
@@ -290,8 +352,20 @@ export default function GamePage() {
                   difficulty={currentQuestion.difficulty}
                   instanceId={currentQuestion.instanceId}
                   onSubmit={handleSubmitAnswer}
-                  answered={answer}
+                  answered={currentSubmittedAnswer}
                 />
+
+                {isProcessingAnswer && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg),transparent_12%)] p-6 backdrop-blur-sm">
+                    <div className="w-full max-w-md border-2 border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-panel),transparent_6%)] p-6 text-center shadow-[0_0_0_2px_rgba(255,24,1,0.15)]">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-4 border-[var(--color-border)] border-t-[var(--color-accent)] animate-spin" />
+                      <p className="mt-5 font-display text-2xl uppercase tracking-[0.14em]">Pit Wall Processing</p>
+                      <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
+                        Locking in your call and syncing it with the race control room.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </Card>
             )}
 
@@ -303,13 +377,22 @@ export default function GamePage() {
               </Card>
             )}
 
-            {resolution && (
+            {resolution && !showWinnerScreen && (
               <Card tone="default" className="p-6 md:p-8">
                 <SectionLabel index="04A" label="Resolution" className="mb-4" />
                 <h2 className="font-display text-4xl uppercase leading-tight md:text-5xl">{resolution.questionText}</h2>
                 <p className="mt-3 font-display text-sm uppercase tracking-[0.16em] text-[var(--color-muted-fg)]">
                   Correct Answer: <span className="text-[var(--color-accent)]">{resolution.correctAnswer}</span>
                 </p>
+                {resolvedAnswer && (
+                  <p
+                    className={`mt-2 font-display text-sm uppercase tracking-[0.16em] ${
+                      resolvedAnswerIsCorrect ? 'text-[#00C853]' : 'text-[#D50000]'
+                    }`}
+                  >
+                    Your Answer: <span>{resolvedAnswer}</span>
+                  </p>
+                )}
                 <div className="mt-5 border-2 border-[var(--color-border)] bg-[var(--color-muted)] p-4">
                   <p className="font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">Explanation</p>
                   <p className="mt-2 font-body text-sm leading-relaxed">{resolution.explanation}</p>
@@ -390,7 +473,7 @@ export default function GamePage() {
               </Card>
             )}
 
-            {!currentQuestion && !resolution && (
+            {!currentQuestion && !resolution && !showWinnerScreen && (
               <Card tone="default" className="swiss-dots p-10 text-center md:p-16">
                 <p className="font-display text-4xl uppercase md:text-6xl">Waiting for Question</p>
                 <p className="mt-3 font-body text-sm text-[var(--color-muted-fg)]">
@@ -408,6 +491,10 @@ export default function GamePage() {
           </div>
 
           <aside>
+            <TireStats
+              leaderStats={raceSnapshot?.leaderStats ?? null}
+              highlighted={tireStatsHighlighted}
+            />
             <Leaderboard entries={leaderboard} currentUserId={currentUserId ?? undefined} />
           </aside>
         </section>

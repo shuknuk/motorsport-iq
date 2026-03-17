@@ -10,6 +10,7 @@ export interface DriverState {
   interval: number | null; // Gap to car ahead in seconds
   tyreCompound: string | null;
   tyreAge: number;
+  stintNumber: number | null;
   drsEnabled: boolean;
   pitCount: number;
   lastLapTime: number | null;
@@ -17,8 +18,16 @@ export interface DriverState {
   retired: boolean;
 }
 
+export interface LeaderStats {
+  name: string;
+  team: string;
+  tyreCompound: string | null;
+  tyreAge: number;
+  stintNumber: number | null;
+}
+
 // Track status types
-export type TrackStatus = 'GREEN' | 'SC' | 'VSC' | 'RED';
+export type TrackStatus = 'GREEN' | 'YELLOW' | 'SC' | 'VSC' | 'RED' | 'CHEQUERED';
 export type SessionMode = 'live' | 'replay';
 export type ProblemReportReason =
   | 'WRONG_ANSWER'
@@ -27,6 +36,12 @@ export type ProblemReportReason =
   | 'TELEMETRY_MISMATCH'
   | 'OTHER';
 export type ProblemReportStatus = 'OPEN' | 'REVIEWED' | 'RESOLVED' | 'DISMISSED';
+export type StatHintKey =
+  | 'TRACK_STATUS'
+  | 'LAP_PROGRESS'
+  | 'TYRE_COMPOUND'
+  | 'TYRE_AGE'
+  | 'STINT_NUMBER';
 
 // Race snapshot built on each lap completion
 export interface RaceSnapshot {
@@ -124,6 +139,17 @@ export interface OpenF1Pit {
   number: number; // pit stop number
 }
 
+export interface OpenF1Stint {
+  session_key: number;
+  meeting_key: number;
+  driver_number: number;
+  stint_number: number;
+  lap_start: number | null;
+  lap_end: number | null;
+  compound: string | null;
+  tyre_age_at_start: number | null;
+}
+
 export interface OpenF1CarData {
   date: string;
   session_key: number;
@@ -209,6 +235,7 @@ export interface QuestionInstanceState {
   explanation?: string;
   cancelledReason?: string;
   cancelledAt?: Date;
+  suggestedStatKeys?: StatHintKey[];
   // Populated for rendering
   questionText?: string;
   driver1?: DriverState;
@@ -275,6 +302,7 @@ export interface QuestionEvent {
   windowSize: number;
   triggeredAt: string;
   answerDeadline: string;
+  suggestedStatKeys?: StatHintKey[];
 }
 
 export interface ResolutionEvent {
@@ -328,11 +356,15 @@ export interface ScoreUpdate {
 export interface RaceSnapshotEvent {
   sessionId: string;
   lapNumber: number;
+  totalLaps: number | null;
   trackStatus: TrackStatus;
   sessionMode: SessionMode;
   replaySpeed: number | null;
   isReplayComplete: boolean;
+  timestamp: string;
+  leaderLapTime: number | null;
   leader: string;
+  leaderStats: LeaderStats | null;
   topThree: string[];
   dataFeedStalled: boolean;
 }

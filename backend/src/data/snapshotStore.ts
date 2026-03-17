@@ -7,6 +7,7 @@ import type {
   OpenF1Position,
   OpenF1Interval,
   OpenF1Pit,
+  OpenF1Stint,
   OpenF1RaceControl,
   DerivedSignals,
   SessionMode,
@@ -24,6 +25,7 @@ interface DriverData {
   latestInterval: OpenF1Interval | null;
   latestLap: OpenF1Lap | null;
   pits: OpenF1Pit[];
+  latestStint: OpenF1Stint | null;
 }
 
 export class SnapshotStore {
@@ -67,6 +69,7 @@ export class SnapshotStore {
           latestInterval: null,
           latestLap: null,
           pits: [],
+          latestStint: null,
         });
       }
     }
@@ -153,8 +156,39 @@ export class SnapshotStore {
     }
   }
 
+  processStintUpdate(stints: OpenF1Stint[]): void {
+    for (const stint of stints) {
+      const driverData = this.drivers.get(stint.driver_number);
+      if (!driverData) {
+        continue;
+      }
+
+      const currentStint = driverData.latestStint;
+      const shouldReplace = !currentStint
+        || stint.stint_number > currentStint.stint_number
+        || (
+          stint.stint_number === currentStint.stint_number
+          && (stint.lap_start ?? 0) >= (currentStint.lap_start ?? 0)
+        );
+
+      if (shouldReplace) {
+        driverData.latestStint = stint;
+      }
+    }
+  }
+
   processRaceControlUpdate(messages: OpenF1RaceControl[]): void {
-    this.trackStatus = this.client.parseTrackStatus(messages);
+    const nextTrackStatus = this.client.parseTrackStatus(messages);
+
+    if (nextTrackStatus === this.trackStatus) {
+      return;
+    }
+
+    this.trackStatus = nextTrackStatus;
+
+    if (this.currentSnapshot) {
+      this.buildSnapshot();
+    }
   }
 
   handleFeedStall(stalled: boolean): void {
@@ -190,8 +224,9 @@ export class SnapshotStore {
         position: data.latestPosition?.position ?? 0,
         gap: data.latestInterval?.gap_to_leader ?? null,
         interval: data.latestInterval?.interval ?? null,
-        tyreCompound: null,
-        tyreAge,
+        tyreCompound: data.latestStint?.compound ?? null,
+        tyreAge: this.calculateCurrentTyreAge(data, tyreAge),
+        stintNumber: data.latestStint?.stint_number ?? null,
         drsEnabled: false,
         pitCount: data.pits.length,
         lastLapTime: data.latestLap?.lap_duration ?? null,
@@ -225,6 +260,22 @@ export class SnapshotStore {
       ? Math.max(...data.pits.map((pit) => pit.lap_number))
       : 0;
     return this.lapNumber - lastPitLap;
+  }
+
+  private calculateCurrentTyreAge(data: DriverData, fallbackTyreAge: number): number {
+    const stint = data.latestStint;
+    if (!stint) {
+      return fallbackTyreAge;
+    }
+
+    const lapStart = stint.lap_start ?? null;
+    const tyreAgeAtStart = stint.tyre_age_at_start ?? 0;
+
+    if (lapStart === null) {
+      return fallbackTyreAge;
+    }
+
+    return Math.max(tyreAgeAtStart, tyreAgeAtStart + Math.max(0, this.lapNumber - lapStart));
   }
 
   calculateDerivedSignals(): DerivedSignals {

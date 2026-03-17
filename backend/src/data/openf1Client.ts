@@ -5,6 +5,7 @@ import type {
   OpenF1Position,
   OpenF1Interval,
   OpenF1Pit,
+  OpenF1Stint,
   OpenF1CarData,
   OpenF1RaceControl,
   TrackStatus,
@@ -14,6 +15,7 @@ const OPENF1_BASE_URL = process.env.OPENF1_BASE_URL || 'https://api.openf1.org/v
 const POLLING_INTERVAL = 10000;
 const MAX_RETRIES = 4;
 const BASE_BACKOFF = 1000;
+const DEBUG_RACE_CONTROL = process.env.DEBUG_RACE_CONTROL === 'true';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -27,6 +29,7 @@ export interface OpenF1ClientOptions {
   onPositionUpdate?: (positions: OpenF1Position[]) => void;
   onIntervalUpdate?: (intervals: OpenF1Interval[]) => void;
   onPitUpdate?: (pits: OpenF1Pit[]) => void;
+  onStintUpdate?: (stints: OpenF1Stint[]) => void;
   onRaceControlUpdate?: (messages: OpenF1RaceControl[]) => void;
   onError?: (error: Error) => void;
   onFeedStall?: (stalled: boolean) => void;
@@ -91,11 +94,12 @@ export class OpenF1Client {
     this.isPolling = true;
 
     try {
-      const [laps, positions, intervals, pits, raceControl] = await Promise.all([
+      const [laps, positions, intervals, pits, stints, raceControl] = await Promise.all([
         this.fetchLaps(),
         this.fetchPositions(),
         this.fetchIntervals(),
         this.fetchPits(),
+        this.fetchStints(),
         this.fetchRaceControl(),
       ]);
 
@@ -128,6 +132,7 @@ export class OpenF1Client {
       if (positions) this.options.onPositionUpdate?.(positions);
       if (intervals) this.options.onIntervalUpdate?.(intervals);
       if (pits) this.options.onPitUpdate?.(pits);
+      if (stints) this.options.onStintUpdate?.(stints);
       if (raceControl) this.options.onRaceControlUpdate?.(raceControl);
 
       this.consecutiveErrors = 0;
@@ -245,6 +250,11 @@ export class OpenF1Client {
     return this.fetchWithCache<OpenF1Pit[]>('/pit', { session_key: this.sessionId }, 5000);
   }
 
+  async fetchStints(): Promise<OpenF1Stint[] | null> {
+    if (!this.sessionId) return null;
+    return this.fetchWithCache<OpenF1Stint[]>('/stints', { session_key: this.sessionId }, 5000);
+  }
+
   async fetchCarData(driverNumber?: number): Promise<OpenF1CarData[] | null> {
     if (!this.sessionId) return null;
     const params: Record<string, string | number> = { session_key: this.sessionId };
@@ -259,29 +269,63 @@ export class OpenF1Client {
 
   parseTrackStatus(messages: OpenF1RaceControl[]): TrackStatus {
     const sorted = messages
-      .filter((message) => message.flag || message.category === 'SafetyCar')
+      .filter(
+        (message) =>
+          Boolean(message.flag) ||
+          message.category === 'SafetyCar' ||
+          message.category === 'Flag'
+      )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     if (sorted.length === 0) return 'GREEN';
 
     const latest = sorted[0];
-    if (latest.flag?.toLowerCase() === 'red') return 'RED';
+    const normalizedFlag = latest.flag?.trim().toLowerCase() ?? '';
+    const normalizedMessage = latest.message?.trim().toLowerCase() ?? '';
 
-    if (
+    let nextStatus: TrackStatus = 'GREEN';
+
+    if (normalizedFlag === 'chequered' || normalizedMessage.includes('chequered')) {
+      nextStatus = 'CHEQUERED';
+    } else if (normalizedFlag === 'red' || normalizedMessage.includes('red flag')) {
+      nextStatus = 'RED';
+    } else if (
       latest.category === 'SafetyCar' ||
-      latest.flag?.toLowerCase() === 'sc' ||
-      latest.message?.toLowerCase().includes('safety car')
+      normalizedFlag === 'sc' ||
+      normalizedMessage.includes('safety car')
     ) {
       if (
-        latest.message?.toLowerCase().includes('virtual') ||
-        latest.flag?.toLowerCase() === 'vsc'
+        normalizedMessage.includes('virtual') ||
+        normalizedFlag === 'vsc'
       ) {
-        return 'VSC';
+        nextStatus = 'VSC';
+      } else {
+        nextStatus = 'SC';
       }
-      return 'SC';
+    } else if (
+      normalizedFlag === 'yellow' ||
+      normalizedFlag === 'double yellow' ||
+      normalizedMessage.includes('yellow')
+    ) {
+      nextStatus = 'YELLOW';
+    } else if (
+      normalizedFlag === 'green' ||
+      normalizedMessage.includes('green flag') ||
+      normalizedMessage.includes('track clear')
+    ) {
+      nextStatus = 'GREEN';
     }
 
-    return 'GREEN';
+    if (DEBUG_RACE_CONTROL) {
+      console.debug('[race-control]', {
+        category: latest.category,
+        flag: latest.flag,
+        message: latest.message,
+        nextStatus,
+      });
+    }
+
+    return nextStatus;
   }
 
   isFeedStalled(): boolean {
