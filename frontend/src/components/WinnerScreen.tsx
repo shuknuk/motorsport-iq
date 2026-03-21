@@ -23,29 +23,51 @@ export default function WinnerScreen({ entries, onBackToLobby }: WinnerScreenPro
   const podium = [rankedEntries[2], rankedEntries[1], rankedEntries[0]].filter(Boolean);
   const remainingEntries = rankedEntries.slice(3);
   const [revealedPlaces, setRevealedPlaces] = useState(0);
+  const [celebrationActive, setCelebrationActive] = useState(false);
 
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
       setRevealedPlaces(3);
+      setCelebrationActive(true);
       return;
     }
 
     setRevealedPlaces(0);
+    setCelebrationActive(false);
     const timers = [350, 700, 1050].map((delay, index) => (
       window.setTimeout(() => {
         setRevealedPlaces(index + 1);
       }, delay)
     ));
+    
+    // Celebration activation timer
+    const celebrationTimer = setTimeout(() => {
+      setCelebrationActive(true);
+    }, 1200);
 
     return () => {
       timers.forEach((timer) => window.clearTimeout(timer));
+      clearTimeout(celebrationTimer);
     };
   }, [entries]);
 
   return (
     <Card tone="default" className="relative overflow-hidden border-2 border-[var(--color-accent)] p-8 md:p-10">
-      <div className="pointer-events-none absolute inset-0 opacity-15 [background-image:repeating-linear-gradient(45deg,transparent,transparent_12px,rgba(255,255,255,0.08)_12px,rgba(255,255,255,0.08)_24px)]" />
+      {/* Celebration confetti effect */}
+      {celebrationActive && (
+        <div className="pointer-events-none absolute inset-0">
+          <div className="animate-bounce inline-block h-4 w-4 bg-[var(--color-accent)]/20 rounded-full" style={{ left: '10%', bottom: '20%' }}></div>
+          <div className="animate-bounce inline-block h-3 w-3 bg-[var(--color-accent)]/15 rounded-full" style={{ left: '20%', bottom: '40%' }}></div>
+          <div className="animate-bounce inline-block h-5 w-5 bg-[var(--color-accent)]/25 rounded-full" style={{ left: '30%', bottom: '30%' }}></div>
+          <div className="animate-bounce inline-block h-4 w-4 bg-[var(--color-accent)]/20 rounded-full" style={{ left: '40%', bottom: '50%' }}></div>
+          <div className="animate-bounce inline-block h-3 w-3 bg-[var(--color-accent)]/15 rounded-full" style={{ left: '50%', bottom: '25%' }}></div>
+          <div className="animate-bounce inline-block h-5 w-5 bg-[var(--color-accent)]/25 rounded-full" style={{ left: '60%', bottom: '45%' }}></div>
+          <div className="animate-bounce inline-block h-4 w-4 bg-[var(--color-accent)]/20 rounded-full" style={{ left: '70%', bottom: '35%' }}></div>
+          <div className="animate-bounce inline-block h-3 w-3 bg-[var(--color-accent)]/15 rounded-full" style={{ left: '80%', bottom: '55%' }}></div>
+          <div className="animate-bounce inline-block h-4 w-4 bg-[var(--color-accent)]/20 rounded-full" style={{ left: '90%', bottom: '20%' }}></div>
+        </div>
+      )}
       <div className="relative">
         <p className="font-display text-xs uppercase tracking-[0.24em] text-[var(--color-muted-fg)]">Race Finished</p>
         <h2 className="mt-3 font-display text-4xl uppercase tracking-tight md:text-6xl">Final Podium</h2>
@@ -76,13 +98,20 @@ export default function WinnerScreen({ entries, onBackToLobby }: WinnerScreenPro
                   </>
                 )}
                 <p className="relative font-display text-xs uppercase tracking-[0.2em] text-[var(--color-muted-fg)]">
-                  {podiumPlace === 1 ? '🏆 1st Place' : podiumPlace === 2 ? '🥈 2nd Place' : '🥉 3rd Place'}
+                  {podiumPlace === 1 ? '🥇 1st Place' : podiumPlace === 2 ? '🥈 2nd Place' : '🥉 3rd Place'}
                 </p>
                 <p className="relative mt-3 font-display text-3xl uppercase leading-none md:text-4xl">{entry.username}</p>
                 <p className="relative mt-4 font-display text-5xl leading-none">{entry.points}</p>
                 <p className="relative mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-fg)]">
                   pts
                 </p>
+                
+                {/* Add celebration effects for winner */}
+                {isWinner && revealed && celebrationActive && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="animate-pulse absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,24,1,0.3),transparent_70%)]" />
+                  </div>
+                )}
               </div>
             );
           })}

@@ -61,6 +61,7 @@ export default function GamePage() {
   const [isSocketConnected, setIsSocketConnected] = useState<boolean>(() => getSocketClient().isConnected());
   const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [localCorrectAnswers, setLocalCorrectAnswers] = useState<number>(0);
 
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
   const hydrateQuestionFromLobby = useEffectEvent((state: LobbyState) => {
@@ -155,7 +156,11 @@ export default function GamePage() {
         setLobbyState(state);
         setLeaderboard(state.leaderboard);
         if (state.currentQuestion) {
-          hydrateQuestionFromLobby(state);
+          // Only hydrate from lobby state if we don't have a current question being processed
+          // to prevent flickering/race conditions
+          if (!currentQuestion) {
+            hydrateQuestionFromLobby(state);
+          }
           return;
         }
 
@@ -232,6 +237,11 @@ export default function GamePage() {
         setReportError(null);
         setReportNote('');
         setReportReason('WRONG_ANSWER');
+        
+        // Update local correct answers counter if user answered correctly
+        if (resolvedAnswerIsCorrect) {
+          setLocalCorrectAnswers(prev => prev + 1);
+        }
       }),
       socket.on(SERVER_EVENTS.LEADERBOARD_UPDATE, (entries: LeaderboardEntry[]) => {
         setLeaderboard(entries);
@@ -401,7 +411,7 @@ export default function GamePage() {
                 <>
                   <span className="border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-1 font-display text-xs uppercase tracking-[0.15em]">
                     {hasRaceCompleted
-                      ? `Lap ${raceCompletedLap}: Race Completed 🏁`
+                      ? `LAP ${raceCompletedLap}: RACE COMPLETED :checkered_flag:`
                       : `Lap ${raceSnapshot.lapNumber}${raceSnapshot.totalLaps ? ` / ${raceSnapshot.totalLaps}` : ''}`}
                   </span>
                   <RaceConditionBadge
@@ -546,7 +556,7 @@ export default function GamePage() {
                               rows={4}
                               placeholder="Add the telemetry detail or answer mismatch you think is wrong."
                               className="w-full border-2 border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 font-body text-sm text-[var(--color-fg)] placeholder:text-[var(--color-muted-fg)] focus-visible:border-[var(--color-accent)] focus-visible:outline-none"
-                            />
+                            ></textarea>
                           </label>
 
                           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -656,7 +666,19 @@ export default function GamePage() {
               leaderStats={raceSnapshot?.leaderStats ?? null}
               highlighted={tireStatsHighlighted}
             />
-            <Leaderboard entries={leaderboard} currentUserId={currentUserId ?? undefined} />
+            {/* Enhance leaderboard with local correct answers for current user */}
+            {currentUserId ? (
+              <Leaderboard 
+                entries={leaderboard.map(entry => 
+                  entry.userId === currentUserId 
+                    ? {...entry, correctAnswers: localCorrectAnswers} 
+                    : entry
+                )}
+                currentUserId={currentUserId}
+              />
+            ) : (
+              <Leaderboard entries={leaderboard} currentUserId={currentUserId ?? undefined} />
+            )}
           </aside>
         </section>
       </div>
