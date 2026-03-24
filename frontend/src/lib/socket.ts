@@ -7,11 +7,13 @@ import type {
   PresenceExpiryReason,
   QuestionEvent,
   QuestionStateEvent,
+  QuestionTextUpdateEvent,
   ResolutionEvent,
   LeaderboardEntry,
   RaceSnapshotEvent,
   ServerErrorEvent,
   SessionInfo,
+  StatHintKey,
 } from './types';
 import { SERVER_EVENTS, CLIENT_EVENTS } from './types';
 
@@ -117,6 +119,10 @@ class SocketClient {
 
     this.socket.on(SERVER_EVENTS.QUESTION_CANCELLED, (data: { instanceId: string; reason: string }) => {
       this.emit(SERVER_EVENTS.QUESTION_CANCELLED, data);
+    });
+
+    this.socket.on(SERVER_EVENTS.QUESTION_TEXT_UPDATE, (data: { instanceId: string; questionText: string; suggestedStatKeys?: StatHintKey[] }) => {
+      this.emit(SERVER_EVENTS.QUESTION_TEXT_UPDATE, data);
     });
 
     this.socket.on(SERVER_EVENTS.RESOLUTION_EVENT, (event: ResolutionEvent) => {

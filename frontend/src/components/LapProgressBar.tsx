@@ -32,9 +32,7 @@ export default function LapProgressBar({
   highlighted = false,
 }: LapProgressBarProps) {
   // Track lap start time based on the timestamp from the race snapshot
-  const lapStartTimeRef = useRef<number>(() => {
-    return new Date(timestamp).getTime();
-  });
+  const lapStartTimeRef = useRef<number>(new Date(timestamp).getTime());
   const previousTimestampRef = useRef<string>(timestamp);
   const previousLapNumberRef = useRef<number>(lapNumber);
 

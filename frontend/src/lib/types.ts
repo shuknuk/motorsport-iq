@@ -131,6 +131,12 @@ export interface QuestionStateEvent {
   answerDeadline?: string;
 }
 
+export interface QuestionTextUpdateEvent {
+  instanceId: string;
+  questionText: string;
+  suggestedStatKeys?: StatHintKey[];
+}
+
 export interface ServerErrorEvent {
   message: string;
   code?: 'SESSION_EXPIRED' | 'TRANSIENT_CONNECTION' | 'VALIDATION_ERROR' | 'UNKNOWN';
@@ -224,6 +230,7 @@ export const SERVER_EVENTS = {
   QUESTION_STATE: 'question_state',
   QUESTION_LOCKED: 'question_locked',
   QUESTION_CANCELLED: 'question_cancelled',
+  QUESTION_TEXT_UPDATE: 'question_text_update',
   RESOLUTION_EVENT: 'resolution_event',
   LEADERBOARD_UPDATE: 'leaderboard_update',
   RACE_SNAPSHOT_UPDATE: 'race_snapshot_update',

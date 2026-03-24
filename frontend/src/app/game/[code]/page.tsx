@@ -19,6 +19,7 @@ import {
   type ProblemReportReason,
   type QuestionEvent,
   type QuestionStateEvent,
+  type QuestionTextUpdateEvent,
   type QuestionState,
   type RaceSnapshotEvent,
   type ResolutionEvent,
@@ -224,6 +225,20 @@ export default function GamePage() {
         setSuggestedStatKeys([]);
         setError(`Question cancelled: ${data.reason}`);
         setTimeout(() => setError(null), 5000);
+      }),
+      socket.on(SERVER_EVENTS.QUESTION_TEXT_UPDATE, (data: QuestionTextUpdateEvent) => {
+        // Update question text when AI generation completes
+        setCurrentQuestion((current) => {
+          if (!current || current.instanceId !== data.instanceId) {
+            return current;
+          }
+          return {
+            ...current,
+            questionText: data.questionText,
+            suggestedStatKeys: data.suggestedStatKeys ?? current.suggestedStatKeys ?? [],
+          };
+        });
+        setSuggestedStatKeys(data.suggestedStatKeys ?? []);
       }),
       socket.on(SERVER_EVENTS.RESOLUTION_EVENT, (event: ResolutionEvent) => {
         setResolution(event);

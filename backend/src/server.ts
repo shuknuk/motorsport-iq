@@ -41,7 +41,7 @@ import {
 } from './lobby/lifecycleManager';
 import { generateQuestionText } from './ai/explanationGenerator';
 import { OpenF1Client } from './data/openf1Client';
-import { selectQuestion, clearCooldowns } from './engine/questionEngine';
+import { selectQuestion, clearCooldowns, formatQuestionText } from './engine/questionEngine';
 import { SessionRuntimeManager, toSessionInfo } from './runtime/sessionRuntimeManager';
 import { PresenceManager, type PresenceExpiryReason } from './lobby/presenceManager';
 import { buildQuestionEventPayload, isUnresolvedQuestionState } from './lobby/questionPayload';
@@ -373,6 +373,7 @@ async function handleUserRemoval(
 
 const presenceManager = new PresenceManager({
   disconnectGraceMs: presenceDisconnectGraceMs,
+  sweepIntervalMs: 60 * 1000, // Changed from 30s to 60s to reduce CPU overhead
   onExpire: async (entry, reason) => {
     await handleUserRemoval(entry.userId, reason, entry.socketId);
   },
@@ -413,34 +414,66 @@ async function checkAndTriggerQuestion(lobbyId: string, snapshot: RaceSnapshot):
   );
 
   if (newQuestion) {
-    newQuestion.questionText = await generateQuestionText(newQuestion);
-    setLatestResolution(lobbyId, null);
-    console.log(`Triggering question ${newQuestion.questionId} for lobby ${lobbyId}`);
-    const suggestedStatKeys = newQuestion.questionText
-      ? await generateSuggestedStatKeys({
-          questionText: newQuestion.questionText,
-          category: getQuestionById(newQuestion.questionId)?.category ?? 'GAP_CLOSING',
-          snapshot,
-        })
-      : [];
-    newQuestion.suggestedStatKeys = suggestedStatKeys;
+    // PERFORMANCE OPTIMIZATION: Generate fallback text immediately to avoid blocking on AI
+    const questionDef = getQuestionById(newQuestion.questionId);
+    const fallbackText = questionDef && newQuestion.driver1
+      ? formatQuestionText(questionDef, newQuestion.driver1, newQuestion.driver2 ?? null)
+      : 'Will this prediction come true?';
 
-    // Broadcast question event
+    // Set initial question text to fallback for immediate broadcast
+    newQuestion.questionText = fallbackText;
+    setLatestResolution(lobbyId, null);
+    console.log(`[PERF] Triggering question ${newQuestion.questionId} for lobby ${lobbyId} (fallback text)`);
+
+    // Broadcast question event immediately with fallback text
     io.to(lobbyId).emit('question_event', {
       ...buildQuestionEventPayload(
         newQuestion,
         getQuestionCategory(newQuestion.questionId),
         getQuestionDifficulty(newQuestion.questionId)
       ),
-      suggestedStatKeys,
+      suggestedStatKeys: [], // Will be populated after AI generation
     });
 
-    // Start lifecycle
+    // Start lifecycle immediately (don't wait for AI)
     await startQuestionLifecycle(
       newQuestion,
       (instance) => handleStateChange(lobbyId, instance),
       (result) => handleResolution(lobbyId, result)
     );
+
+    // PERFORMANCE OPTIMIZATION: Fire AI generation in background
+    const aiStartTime = Date.now();
+    generateQuestionText(newQuestion).then(async (aiText) => {
+      const aiDuration = Date.now() - aiStartTime;
+      if (aiDuration > 1000) {
+        console.log(`[PERF] AI question generation took ${aiDuration}ms (slow)`);
+      }
+
+      // Only emit update if AI text is different from fallback
+      if (aiText !== fallbackText) {
+        newQuestion.questionText = aiText;
+
+        // Generate suggested stat keys based on AI text
+        const suggestedStatKeys = await generateSuggestedStatKeys({
+          questionText: aiText,
+          category: questionDef?.category ?? 'GAP_CLOSING',
+          snapshot,
+        });
+        newQuestion.suggestedStatKeys = suggestedStatKeys;
+
+        // Broadcast updated question text and stat hints
+        io.to(lobbyId).emit('question_text_update', {
+          instanceId: newQuestion.id,
+          questionText: aiText,
+          suggestedStatKeys,
+        });
+
+        console.log(`[PERF] Broadcast AI text update for question ${newQuestion.questionId} in lobby ${lobbyId}`);
+      }
+    }).catch((error) => {
+      console.error('[PERF] Failed to generate AI question text:', error);
+    });
   }
 }
 
