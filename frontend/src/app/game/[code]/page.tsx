@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useEffectEvent, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import QuestionCard from '@/components/QuestionCard';
 import CountdownTimer from '@/components/CountdownTimer';
@@ -64,6 +64,9 @@ export default function GamePage() {
   const [isLeaving, setIsLeaving] = useState(false);
   const [localCorrectAnswers, setLocalCorrectAnswers] = useState<number>(0);
 
+  // Track processed resolutions to prevent flickering from duplicate events
+  const processedResolutionIds = useRef<Set<string>>(new Set());
+
   const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('msp_user_id') : null;
   const hydrateQuestionFromLobby = useEffectEvent((state: LobbyState) => {
     const question = state.currentQuestion;
@@ -80,10 +83,12 @@ export default function GamePage() {
         ? question.triggeredAt
         : new Date(question.triggeredAt).toISOString();
 
-      // The server transitions: TRIGGERED (1s) -> LIVE (20s) -> LOCKED
-      // The 20-second answer window starts when state becomes LIVE
-      // triggeredAt + 1s = when LIVE starts, + 20s = when it locks
-      const answerDeadline = new Date(new Date(triggeredAt).getTime() + 21_000).toISOString();
+      // Use server's answerDeadline if available, fallback to client calculation
+      const answerDeadline = question.answerDeadline
+        ? (typeof question.answerDeadline === 'string'
+            ? question.answerDeadline
+            : new Date(question.answerDeadline).toISOString())
+        : new Date(new Date(triggeredAt).getTime() + 21_000).toISOString();
 
       return {
         instanceId: question.id,
@@ -166,18 +171,19 @@ export default function GamePage() {
         }
 
         if (state.latestResolution) {
-          setResolution(state.latestResolution);
-          setQuestionState('RESOLVED');
+          // Only set resolution from lobby state if not already processed
+          if (!processedResolutionIds.current.has(state.latestResolution.instanceId)) {
+            processedResolutionIds.current.add(state.latestResolution.instanceId);
+            setResolution(state.latestResolution);
+            setQuestionState('RESOLVED');
+          }
         }
       }),
       socket.on(SERVER_EVENTS.QUESTION_EVENT, (event: QuestionEvent) => {
-        // Ensure answerDeadline accounts for the 1s TRIGGERED delay + 20s LIVE window
-        const triggeredAt = new Date(event.triggeredAt).getTime();
-        const correctDeadline = new Date(triggeredAt + 21_000).toISOString();
-
+        // Use server's answerDeadline directly (already calculated by server)
         setCurrentQuestion({
           ...event,
-          answerDeadline: correctDeadline,
+          answerDeadline: event.answerDeadline,
         });
         setQuestionState(event.state ?? 'LIVE');
         setResolution(null);
@@ -241,6 +247,13 @@ export default function GamePage() {
         setSuggestedStatKeys(data.suggestedStatKeys ?? []);
       }),
       socket.on(SERVER_EVENTS.RESOLUTION_EVENT, (event: ResolutionEvent) => {
+        // Deduplicate: skip if already processed this resolution
+        if (processedResolutionIds.current.has(event.instanceId)) {
+          console.log(`[RESOLUTION] Skipping duplicate for ${event.instanceId}`);
+          return;
+        }
+        processedResolutionIds.current.add(event.instanceId);
+
         setResolution(event);
         setQuestionState('RESOLVED');
         setCurrentQuestion(null);

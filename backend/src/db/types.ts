@@ -274,8 +274,9 @@ export interface Database {
           p_user_id: string;
           p_points_change: number;
           p_is_correct: boolean;
+          p_instance_id: string;
         };
-        Returns: void;
+        Returns: boolean;
       };
     };
   };

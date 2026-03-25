@@ -160,6 +160,7 @@ export async function startQuestionLifecycle(
     instance.state = 'LIVE';
     const deadline = new Date(Date.now() + ANSWER_WINDOW_MS);
     answerDeadlines.set(instance.id, deadline);
+    instance.answerDeadline = deadline; // Store in instance for client countdown
     await updateQuestionState(instance.id, 'LIVE');
     onStateChange({ ...instance });
 
@@ -461,12 +462,13 @@ async function processAnswers(
         scoreResult
       );
 
-      // Update leaderboard in database using the stored procedure
+      // Update leaderboard in database using the stored procedure (with idempotency)
       await supabase.rpc('update_leaderboard', {
         p_lobby_id: instance.lobbyId,
         p_user_id: answer.user_id,
         p_points_change: scoreResult.pointsChange,
         p_is_correct: scoreResult.isCorrect,
+        p_instance_id: instance.id,
       });
 
       const user = lobbyState.players.find((player) => player.id === answer.user_id);

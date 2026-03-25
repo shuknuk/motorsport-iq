@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS leaderboard (
     wrong_answers INTEGER DEFAULT 0,
     questions_answered INTEGER DEFAULT 0,
     accuracy DECIMAL(5,2) DEFAULT 0.00,
+    scored_instance_ids UUID[] DEFAULT '{}', -- Track scored questions to prevent double-scoring
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(lobby_id, user_id)
 );
@@ -127,16 +128,32 @@ CREATE INDEX IF NOT EXISTS idx_leaderboard_lobby_id ON leaderboard(lobby_id);
 CREATE INDEX IF NOT EXISTS idx_lobbies_code ON lobbies(code);
 CREATE INDEX IF NOT EXISTS idx_lobbies_status ON lobbies(status);
 
--- Function to update leaderboard
+-- Function to update leaderboard (with idempotency to prevent double-scoring)
 CREATE OR REPLACE FUNCTION update_leaderboard(
     p_lobby_id UUID,
     p_user_id UUID,
     p_points_change INTEGER,
-    p_is_correct BOOLEAN
+    p_is_correct BOOLEAN,
+    p_instance_id UUID
 )
-RETURNS VOID AS $$
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_already_scored BOOLEAN;
 BEGIN
-    INSERT INTO leaderboard (lobby_id, user_id, points, streak, max_streak, correct_answers, wrong_answers, questions_answered, accuracy)
+    -- Check if this instance has already been scored for this user
+    SELECT EXISTS (
+        SELECT 1 FROM leaderboard
+        WHERE lobby_id = p_lobby_id
+        AND user_id = p_user_id
+        AND p_instance_id = ANY(scored_instance_ids)
+    ) INTO v_already_scored;
+
+    -- If already scored, return false and skip updates
+    IF v_already_scored THEN
+        RETURN false;
+    END IF;
+
+    INSERT INTO leaderboard (lobby_id, user_id, points, streak, max_streak, correct_answers, wrong_answers, questions_answered, accuracy, scored_instance_ids)
     VALUES (
         p_lobby_id,
         p_user_id,
@@ -146,7 +163,8 @@ BEGIN
         CASE WHEN p_is_correct THEN 1 ELSE 0 END,
         CASE WHEN NOT p_is_correct THEN 1 ELSE 0 END,
         1,
-        CASE WHEN p_is_correct THEN 100.00 ELSE 0.00 END
+        CASE WHEN p_is_correct THEN 100.00 ELSE 0.00 END,
+        ARRAY[p_instance_id]
     )
     ON CONFLICT (lobby_id, user_id)
     DO UPDATE SET
@@ -168,7 +186,10 @@ BEGIN
             THEN ROUND((leaderboard.correct_answers + CASE WHEN p_is_correct THEN 1 ELSE 0 END)::DECIMAL / (leaderboard.questions_answered + 1) * 100, 2)
             ELSE 0.00
         END,
+        scored_instance_ids = array_append(COALESCE(leaderboard.scored_instance_ids, ARRAY[]::UUID[]), p_instance_id),
         updated_at = NOW();
+
+    RETURN true;
 END;
 $$ LANGUAGE plpgsql;
 

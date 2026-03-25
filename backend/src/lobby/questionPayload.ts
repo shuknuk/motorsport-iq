@@ -32,7 +32,7 @@ export function buildQuestionEventPayload(
     difficulty,
     windowSize: instance.windowSize,
     triggeredAt: instance.triggeredAt.toISOString(),
-    answerDeadline: (options.answerDeadline ?? new Date(instance.triggeredAt.getTime() + ANSWER_WINDOW_MS)).toISOString(),
+    answerDeadline: (options.answerDeadline ?? instance.answerDeadline ?? new Date(instance.triggeredAt.getTime() + ANSWER_WINDOW_MS)).toISOString(),
     suggestedStatKeys: instance.suggestedStatKeys ?? [],
   };
 

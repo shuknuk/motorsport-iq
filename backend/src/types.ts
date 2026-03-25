@@ -239,6 +239,7 @@ export interface QuestionInstanceState {
   cancelledReason?: string;
   cancelledAt?: Date;
   suggestedStatKeys?: StatHintKey[];
+  answerDeadline?: Date; // Server-calculated deadline for accurate countdown
   // Populated for rendering
   questionText?: string;
   driver1?: DriverState;
