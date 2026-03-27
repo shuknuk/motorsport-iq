@@ -68,17 +68,21 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'https://motorsport-iq.vercel.app',
 ];
 
+function normalizeOriginValue(origin: string): string {
+  return origin.trim().replace(/\/+$/, '');
+}
+
 function parseAllowedOrigins(value: string | undefined): string[] {
   const configuredOrigins = value
     ?.split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => normalizeOriginValue(origin))
     .filter(Boolean) ?? [];
 
   const allowedOrigins = configuredOrigins.length > 0
     ? configuredOrigins
     : DEFAULT_ALLOWED_ORIGINS;
 
-  return [...new Set(allowedOrigins)];
+  return [...new Set(allowedOrigins.map((origin) => normalizeOriginValue(origin)))];
 }
 
 const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
@@ -107,7 +111,19 @@ function isOriginAllowed(origin: string | undefined): boolean {
     return true;
   }
 
-  return allowedOrigins.includes(origin);
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  const normalizedOrigin = normalizeOriginValue(parsed.origin);
+  const hostname = parsed.hostname.toLowerCase();
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isVercelDomain = hostname === 'motorsport-iq.vercel.app' || hostname.endsWith('.vercel.app');
+
+  return allowedOrigins.includes(normalizedOrigin) || isLocalhost || isVercelDomain;
 }
 
 const corsOptions: CorsOptions = {
@@ -150,6 +166,7 @@ function toRaceSnapshotEvent(snapshot: RaceSnapshot): RaceSnapshotEvent {
     isReplayComplete: snapshot.isReplayComplete,
     timestamp: snapshot.timestamp.toISOString(),
     leaderLapTime: snapshot.leaderLapTime,
+    leaderLapStartTime: snapshot.leaderLapStartTime,
     leader: leader?.name ?? '',
     leaderNameSource: leader?.nameSource ?? 'unknown',
     leaderTelemetryTimestamp: leader?.lastTelemetryTimestamp ?? null,
@@ -885,6 +902,7 @@ process.on('SIGINT', () => {
 // Start server
 httpServer.listen(PORT, () => {
   console.log(`Motorsport IQ server running on port ${PORT}`);
+  console.log(`[CORS] Allowed origins: ${allowedOrigins.join(', ')}`);
 });
 
 export { io, app, httpServer };

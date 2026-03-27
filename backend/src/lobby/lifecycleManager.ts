@@ -43,6 +43,7 @@ const activeQuestions: Map<string, QuestionInstanceState> = new Map();
 // Paused questions (SC/VSC)
 const pausedQuestions: Map<string, QuestionInstanceState> = new Map();
 const scoredQuestionInstances: Set<string> = new Set();
+const UNRESOLVED_STATES = new Set(['TRIGGERED', 'LIVE', 'LOCKED', 'ACTIVE']);
 
 function trackLobbyTimer(lobbyId: string, timer: NodeJS.Timeout): void {
   const timers = lobbyTimers.get(lobbyId) ?? new Set<NodeJS.Timeout>();
@@ -499,22 +500,6 @@ export async function submitAnswer(
   userId: string,
   answer: 'YES' | 'NO'
 ): Promise<{ success: boolean; error?: string }> {
-  const instance = [...activeQuestions.values()].find((q) => q.id === instanceId);
-
-  if (!instance) {
-    return { success: false, error: 'Question not found' };
-  }
-
-  if (instance.state !== 'LIVE') {
-    return { success: false, error: 'Answer period has ended' };
-  }
-
-  // Check if deadline passed
-  const deadline = answerDeadlines.get(instanceId);
-  if (deadline && new Date() > deadline) {
-    return { success: false, error: 'Answer period has ended' };
-  }
-
   // Check if already answered
   const { data: existingAnswer } = await supabase
     .from('answers')
@@ -524,11 +509,50 @@ export async function submitAnswer(
     .single();
 
   if (existingAnswer) {
+    if (existingAnswer.answer === answer) {
+      return { success: true };
+    }
     return { success: false, error: 'Already answered' };
   }
 
+  let instance = [...activeQuestions.values()].find((q) => q.id === instanceId) ?? null;
+  let fallbackTriggeredAt: Date | null = null;
+
+  if (!instance) {
+    const { data: persistedInstance } = await supabase
+      .from('question_instances')
+      .select('id, state, triggered_at')
+      .eq('id', instanceId)
+      .single();
+
+    if (!persistedInstance || !UNRESOLVED_STATES.has(persistedInstance.state)) {
+      return { success: false, error: 'Question not found' };
+    }
+
+    fallbackTriggeredAt = new Date(persistedInstance.triggered_at);
+    instance = {
+      id: persistedInstance.id,
+      state: persistedInstance.state,
+      triggeredAt: fallbackTriggeredAt,
+    } as QuestionInstanceState;
+  }
+
+  if (instance.state !== 'LIVE') {
+    return { success: false, error: 'Answer period has ended' };
+  }
+
+  // Check if deadline passed
+  const inMemoryDeadline = answerDeadlines.get(instanceId);
+  const fallbackDeadline = fallbackTriggeredAt
+    ? new Date(fallbackTriggeredAt.getTime() + TRIGGER_TO_LIVE_MS + ANSWER_WINDOW_MS)
+    : null;
+  const effectiveDeadline = inMemoryDeadline ?? fallbackDeadline;
+  if (effectiveDeadline && new Date() > effectiveDeadline) {
+    return { success: false, error: 'Answer period has ended' };
+  }
+
   // Calculate response time
-  const responseTimeMs = Date.now() - instance.triggeredAt.getTime();
+  const responseTimeMs = Math.max(0, Date.now() - instance.triggeredAt.getTime());
 
   // Save answer
   const { error } = await supabase.from('answers').insert({
@@ -539,6 +563,17 @@ export async function submitAnswer(
   });
 
   if (error) {
+    const { data: savedAnswer } = await supabase
+      .from('answers')
+      .select('answer')
+      .eq('instance_id', instanceId)
+      .eq('user_id', userId)
+      .single();
+
+    if (savedAnswer?.answer === answer) {
+      return { success: true };
+    }
+
     return { success: false, error: 'Failed to save answer' };
   }
 

@@ -177,6 +177,49 @@ describe('SnapshotStore race control updates', () => {
     expect(leader?.tyreCompound).toBe('MEDIUM');
   });
 
+  it('selects the opening stint at race start even when future stints are already loaded', async () => {
+    const client = {
+      getDrivers: jest.fn(async () => [createDriver()]),
+      parseTrackStatus: jest.fn(() => 'GREEN' as const),
+    } as any;
+
+    const store = new SnapshotStore(client);
+    await store.initialize(1001, { sessionMode: 'replay', replaySpeed: 10 });
+
+    store.processStintUpdate([
+      createStint({ stint_number: 1, lap_start: 1, lap_end: 19, compound: 'SOFT' }),
+      createStint({ stint_number: 2, lap_start: 20, lap_end: 40, compound: 'MEDIUM' }),
+    ]);
+    store.processLapCompletion(createLap({ lap_number: 1, date_start: '2025-09-01T13:00:00Z' }));
+
+    const leader = store.getCurrentSnapshot()?.drivers[0];
+    expect(leader?.stintNumber).toBe(1);
+    expect(leader?.tyreCompound).toBe('SOFT');
+    expect(store.getCurrentSnapshot()?.leaderLapStartTime).toBe('2025-09-01T13:00:00Z');
+  });
+
+  it('switches stints only when current lap enters the next stint window', async () => {
+    const client = {
+      getDrivers: jest.fn(async () => [createDriver()]),
+      parseTrackStatus: jest.fn(() => 'GREEN' as const),
+    } as any;
+
+    const store = new SnapshotStore(client);
+    await store.initialize(1001, { sessionMode: 'replay', replaySpeed: 10 });
+
+    store.processStintUpdate([
+      createStint({ stint_number: 1, lap_start: 1, lap_end: 19, compound: 'SOFT' }),
+      createStint({ stint_number: 2, lap_start: 20, lap_end: 40, compound: 'MEDIUM' }),
+    ]);
+
+    store.processLapCompletion(createLap({ lap_number: 19 }));
+    expect(store.getCurrentSnapshot()?.drivers[0]?.stintNumber).toBe(1);
+
+    store.processLapCompletion(createLap({ lap_number: 20 }));
+    expect(store.getCurrentSnapshot()?.drivers[0]?.stintNumber).toBe(2);
+    expect(store.getCurrentSnapshot()?.drivers[0]?.tyreCompound).toBe('MEDIUM');
+  });
+
   it('emits HUD snapshot updates on telemetry changes with a 1s throttle', async () => {
     const onSnapshotUpdate = jest.fn();
     const client = {

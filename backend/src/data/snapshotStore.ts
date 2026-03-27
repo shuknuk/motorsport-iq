@@ -25,7 +25,7 @@ interface DriverData {
   latestInterval: OpenF1Interval | null;
   latestLap: OpenF1Lap | null;
   pits: OpenF1Pit[];
-  latestStint: OpenF1Stint | null;
+  stints: OpenF1Stint[];
 }
 
 const DEBUG_DRIVER_PROVENANCE = process.env.DEBUG_DRIVER_PROVENANCE === 'true';
@@ -92,7 +92,7 @@ export class SnapshotStore {
           latestInterval: null,
           latestLap: null,
           pits: [],
-          latestStint: null,
+          stints: [],
         });
       }
     }
@@ -189,27 +189,30 @@ export class SnapshotStore {
         continue;
       }
 
-      const currentStint = driverData.latestStint;
-      const hasStintTimestamp = Boolean(stint.date);
-      const hasCurrentTimestamp = Boolean(currentStint?.date);
-      const shouldReplace = !currentStint
-        || (
-          hasStintTimestamp
-          && hasCurrentTimestamp
-          && hasNewerTimestamp(stint.date, currentStint.date)
+      const existingIndex = driverData.stints.findIndex((entry) => entry.stint_number === stint.stint_number);
+      if (existingIndex === -1) {
+        driverData.stints.push(stint);
+      } else {
+        const existing = driverData.stints[existingIndex];
+        const hasIncomingTimestamp = Boolean(stint.date);
+        const hasExistingTimestamp = Boolean(existing.date);
+        const shouldReplace = (
+          hasIncomingTimestamp
+          && hasExistingTimestamp
+          && hasNewerTimestamp(stint.date, existing.date)
         )
         || (
-          hasStintTimestamp
-          && !hasCurrentTimestamp
+          hasIncomingTimestamp
+          && !hasExistingTimestamp
         )
-        || stint.stint_number > currentStint.stint_number
         || (
-          stint.stint_number === currentStint.stint_number
-          && (stint.lap_start ?? 0) >= (currentStint.lap_start ?? 0)
+          stint.stint_number === existing.stint_number
+          && (stint.lap_start ?? -1) >= (existing.lap_start ?? -1)
         );
 
-      if (shouldReplace) {
-        driverData.latestStint = stint;
+        if (shouldReplace) {
+          driverData.stints[existingIndex] = stint;
+        }
       }
     }
     this.scheduleHudSnapshotUpdate();
@@ -254,6 +257,7 @@ export class SnapshotStore {
       if (!data.driver) continue;
 
       const tyreAge = this.calculateTyreAge(data);
+      const activeStint = this.getActiveStintForCurrentLap(data);
       const name = data.driver.full_name || data.driver.broadcast_name || `Driver ${driverNumber}`;
       const nameSource = data.driver.full_name
         ? 'full_name'
@@ -270,9 +274,9 @@ export class SnapshotStore {
         position: data.latestPosition?.position ?? 0,
         gap: data.latestInterval?.gap_to_leader ?? null,
         interval: data.latestInterval?.interval ?? null,
-        tyreCompound: data.latestStint?.compound ?? null,
-        tyreAge: this.calculateCurrentTyreAge(data, tyreAge),
-        stintNumber: data.latestStint?.stint_number ?? null,
+        tyreCompound: activeStint?.compound ?? null,
+        tyreAge: this.calculateCurrentTyreAge(activeStint, tyreAge),
+        stintNumber: activeStint?.stint_number ?? null,
         drsEnabled: false,
         pitCount: data.pits.length,
         lastLapTime: data.latestLap?.lap_duration ?? null,
@@ -290,6 +294,9 @@ export class SnapshotStore {
         ? driverStates.find((driver) => driver.driverNumber === previousLeaderDriverNumber)
         : null)
       ?? driverStates[0];
+    const leaderLapStartTime = leader
+      ? this.drivers.get(leader.driverNumber)?.latestLap?.date_start ?? null
+      : null;
     const orderedDrivers = leader
       ? [leader, ...driverStates.filter((driver) => driver.driverNumber !== leader.driverNumber)]
       : driverStates;
@@ -306,6 +313,7 @@ export class SnapshotStore {
       timestamp: new Date(),
       dataFeedStalled: false,
       leaderLapTime: leader?.lastLapTime ?? null,
+      leaderLapStartTime,
     };
 
     if (DEBUG_DRIVER_PROVENANCE && leader) {
@@ -349,8 +357,7 @@ export class SnapshotStore {
     return this.lapNumber - lastPitLap;
   }
 
-  private calculateCurrentTyreAge(data: DriverData, fallbackTyreAge: number): number {
-    const stint = data.latestStint;
+  private calculateCurrentTyreAge(stint: OpenF1Stint | null, fallbackTyreAge: number): number {
     if (!stint) {
       return fallbackTyreAge;
     }
@@ -366,11 +373,12 @@ export class SnapshotStore {
   }
 
   private getDriverTelemetryTimestamp(data: DriverData): string | null {
+    const activeStint = this.getActiveStintForCurrentLap(data);
     const timestamps = [
       data.latestPosition?.date ?? null,
       data.latestInterval?.date ?? null,
       data.latestLap?.date_start ?? null,
-      data.latestStint?.date ?? null,
+      activeStint?.date ?? null,
       data.pits.length > 0 ? data.pits[data.pits.length - 1]?.date ?? null : null,
     ];
 
@@ -386,6 +394,55 @@ export class SnapshotStore {
     }
 
     return latestValue;
+  }
+
+  private getActiveStintForCurrentLap(data: DriverData): OpenF1Stint | null {
+    if (data.stints.length === 0) {
+      return null;
+    }
+
+    const sorted = [...data.stints].sort((a, b) => {
+      const aLapStart = a.lap_start ?? Number.MAX_SAFE_INTEGER;
+      const bLapStart = b.lap_start ?? Number.MAX_SAFE_INTEGER;
+      if (aLapStart !== bLapStart) {
+        return aLapStart - bLapStart;
+      }
+      return a.stint_number - b.stint_number;
+    });
+
+    if (this.lapNumber <= 0) {
+      return sorted[0] ?? null;
+    }
+
+    const activeByWindow = sorted.filter((stint) => {
+      const lapStart = stint.lap_start ?? Number.MIN_SAFE_INTEGER;
+      const lapEnd = stint.lap_end ?? Number.MAX_SAFE_INTEGER;
+      return lapStart <= this.lapNumber && this.lapNumber <= lapEnd;
+    });
+
+    if (activeByWindow.length > 0) {
+      return activeByWindow.sort((a, b) => {
+        const aLapStart = a.lap_start ?? Number.MIN_SAFE_INTEGER;
+        const bLapStart = b.lap_start ?? Number.MIN_SAFE_INTEGER;
+        if (aLapStart !== bLapStart) {
+          return bLapStart - aLapStart;
+        }
+        return b.stint_number - a.stint_number;
+      })[0] ?? null;
+    }
+
+    const latestKnownBeforeLap = sorted
+      .filter((stint) => (stint.lap_start ?? Number.MIN_SAFE_INTEGER) <= this.lapNumber)
+      .sort((a, b) => {
+        const aLapStart = a.lap_start ?? Number.MIN_SAFE_INTEGER;
+        const bLapStart = b.lap_start ?? Number.MIN_SAFE_INTEGER;
+        if (aLapStart !== bLapStart) {
+          return bLapStart - aLapStart;
+        }
+        return b.stint_number - a.stint_number;
+      })[0];
+
+    return latestKnownBeforeLap ?? sorted[0] ?? null;
   }
 
   calculateDerivedSignals(): DerivedSignals {

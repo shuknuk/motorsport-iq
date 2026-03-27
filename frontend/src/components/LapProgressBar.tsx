@@ -6,8 +6,8 @@ import { cn } from '@/lib/cn';
 interface LapProgressBarProps {
   lapNumber: number;
   totalLaps: number | null;
-  timestamp: string;
   leaderLapTime: number | null;
+  leaderLapStartTime: string | null;
   raceCompleted: boolean;
   highlighted?: boolean;
 }
@@ -26,24 +26,36 @@ function calculateProgress(lapStartTime: number, leaderLapTime: number | null, c
 export default function LapProgressBar({
   lapNumber,
   totalLaps,
-  timestamp,
   leaderLapTime,
+  leaderLapStartTime,
   raceCompleted,
   highlighted = false,
 }: LapProgressBarProps) {
-  // Track lap start time based on the timestamp from the race snapshot
-  const lapStartTimeRef = useRef<number>(new Date(timestamp).getTime());
-  const previousTimestampRef = useRef<string>(timestamp);
+  // Track lap start time based on telemetry lap start time from backend
+  const lapStartTimeRef = useRef<number>(
+    leaderLapStartTime ? new Date(leaderLapStartTime).getTime() : Date.now()
+  );
   const previousLapNumberRef = useRef<number>(lapNumber);
+  const lastProgressRef = useRef<number>(0);
 
   useEffect(() => {
-    // Update lap start time when the timestamp changes (indicating a new lap) or lap number changes
-    if (timestamp !== previousTimestampRef.current || lapNumber !== previousLapNumberRef.current) {
-      lapStartTimeRef.current = new Date(timestamp).getTime();
-      previousTimestampRef.current = timestamp;
+    // Reset on actual lap transition
+    if (lapNumber !== previousLapNumberRef.current) {
+      if (leaderLapStartTime) {
+        lapStartTimeRef.current = new Date(leaderLapStartTime).getTime();
+      } else {
+        lapStartTimeRef.current = Date.now();
+      }
       previousLapNumberRef.current = lapNumber;
+      lastProgressRef.current = 0;
+      return;
     }
-  }, [timestamp, lapNumber]);
+
+    // Refresh lap start anchor if telemetry start time updates for current lap
+    if (leaderLapStartTime) {
+      lapStartTimeRef.current = new Date(leaderLapStartTime).getTime();
+    }
+  }, [leaderLapStartTime, lapNumber]);
 
   const [progress, setProgress] = useState(() => {
     if (raceCompleted) return 100;
@@ -57,9 +69,16 @@ export default function LapProgressBar({
       return;
     }
 
-    setProgress(calculateProgress(lapStartTimeRef.current, leaderLapTime, Date.now()));
+    const updateProgress = () => {
+      const nextProgress = calculateProgress(lapStartTimeRef.current, leaderLapTime, Date.now());
+      const monotonicProgress = Math.max(lastProgressRef.current, nextProgress);
+      lastProgressRef.current = monotonicProgress;
+      setProgress(monotonicProgress);
+    };
+
+    updateProgress();
     const interval = window.setInterval(() => {
-      setProgress(calculateProgress(lapStartTimeRef.current, leaderLapTime, Date.now()));
+      updateProgress();
     }, 250);
 
     return () => window.clearInterval(interval);

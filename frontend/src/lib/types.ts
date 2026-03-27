@@ -45,6 +45,7 @@ export interface QuestionInstanceState {
   questionId: string;
   state: QuestionState;
   triggeredAt: string;
+  answerDeadline?: string;
   lockedAt?: string;
   resolvedAt?: string;
   closedAt?: string;
@@ -68,6 +69,7 @@ export interface RaceSnapshot {
   timestamp: string;
   dataFeedStalled: boolean;
   leaderLapTime: number | null;
+  leaderLapStartTime: string | null;
 }
 
 export interface DriverState {
@@ -200,6 +202,7 @@ export interface RaceSnapshotEvent {
   isReplayComplete: boolean;
   timestamp: string;
   leaderLapTime: number | null;
+  leaderLapStartTime: string | null;
   leader: string;
   leaderNameSource?: 'full_name' | 'broadcast_name' | 'unknown';
   leaderTelemetryTimestamp?: string | null;

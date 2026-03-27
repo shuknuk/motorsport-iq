@@ -59,6 +59,7 @@ function createSnapshot(overrides: Partial<RaceSnapshot> = {}): RaceSnapshot {
     timestamp: new Date('2026-03-13T12:00:00Z'),
     dataFeedStalled: false,
     leaderLapTime: 90.5,
+    leaderLapStartTime: '2026-03-13T11:58:30Z',
     ...overrides,
   };
 }

@@ -58,6 +58,7 @@ export interface RaceSnapshot {
   timestamp: Date;
   dataFeedStalled: boolean;
   leaderLapTime: number | null;
+  leaderLapStartTime: string | null;
 }
 
 // OpenF1 API response types
@@ -380,6 +381,7 @@ export interface RaceSnapshotEvent {
   isReplayComplete: boolean;
   timestamp: string;
   leaderLapTime: number | null;
+  leaderLapStartTime: string | null;
   leader: string;
   leaderNameSource?: 'full_name' | 'broadcast_name' | 'unknown';
   leaderTelemetryTimestamp?: string | null;

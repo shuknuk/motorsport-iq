@@ -14,6 +14,7 @@ function createSnapshot(): RaceSnapshot {
     timestamp: new Date('2025-01-01T00:00:00.000Z'),
     dataFeedStalled: false,
     leaderLapTime: 89.2,
+    leaderLapStartTime: '2024-12-31T23:58:31.000Z',
   };
 }
 

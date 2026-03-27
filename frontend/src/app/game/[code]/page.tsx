@@ -113,15 +113,31 @@ export default function GamePage() {
   });
 
   const handleSocketError = useEffectEvent(({ message, code }: ServerErrorEvent) => {
+    const normalizedMessage = message.toLowerCase();
     const isSessionExpired = code === 'SESSION_EXPIRED'
-      || message.toLowerCase().includes('user not in any lobby')
-      || message.toLowerCase().includes('user not found')
-      || message.toLowerCase().includes('session expired');
+      || normalizedMessage.includes('user not in any lobby')
+      || normalizedMessage.includes('user not found')
+      || normalizedMessage.includes('session expired');
 
     if (isSessionExpired) {
       localStorage.removeItem('msp_user_id');
       setConnectionNotice('Session expired. Redirecting to lobby join.');
       router.push('/');
+      return;
+    }
+
+    const currentInstanceId = currentQuestion?.instanceId ?? null;
+    const hasLocalSubmission = currentInstanceId
+      ? Boolean(submittedAnswers[currentInstanceId])
+      : false;
+    const isStaleSubmissionError = (
+      normalizedMessage.includes('answer period has ended')
+      || normalizedMessage.includes('question not found')
+      || normalizedMessage.includes('already answered')
+    ) && (isProcessingAnswer || hasLocalSubmission);
+
+    if (isStaleSubmissionError) {
+      setIsProcessingAnswer(false);
       return;
     }
 
@@ -215,8 +231,15 @@ export default function GamePage() {
           if (data.state !== 'LIVE') {
             setIsProcessingAnswer(false);
           }
+          if (['RESOLVED', 'EXPLAINED', 'CLOSED'].includes(data.state)) {
+            setCurrentQuestion((current) => (
+              current?.instanceId === data.instanceId ? null : current
+            ));
+            setSuggestedStatKeys([]);
+          }
           if (data.state === 'CANCELLED') {
             setCurrentQuestion(null);
+            setSuggestedStatKeys([]);
           }
         }
       ),
@@ -481,8 +504,8 @@ export default function GamePage() {
               <LapProgressBar
                 lapNumber={raceSnapshot.lapNumber}
                 totalLaps={raceSnapshot.totalLaps}
-                timestamp={raceSnapshot.timestamp}
                 leaderLapTime={raceSnapshot.leaderLapTime}
+                leaderLapStartTime={raceSnapshot.leaderLapStartTime}
                 raceCompleted={hasRaceCompleted}
                 highlighted={suggestedStatKeys.includes('LAP_PROGRESS')}
               />
