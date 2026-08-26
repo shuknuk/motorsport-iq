@@ -8,6 +8,7 @@ enum ReportReason: String, CaseIterable, Sendable { case wrongAnswer = "WRONG_AN
 @Observable
 final class AppModel {
     let socket: SocketService
+    let soundService: SoundService
     var route: AppRoute = .home
     var username = UserDefaults.standard.string(forKey: "msp_username") ?? ""
     var lobbyCode = UserDefaults.standard.string(forKey: "msp_lobby_code") ?? ""
@@ -27,9 +28,13 @@ final class AppModel {
     var reportReason: ReportReason = .other
     var reportNote = ""
     var reportSubmitted = false
+    var soundsEnabled = UserDefaults.standard.object(forKey: "msp_sounds_enabled") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(soundsEnabled, forKey: "msp_sounds_enabled") }
+    }
 
-    init(socket: SocketService = SocketService()) {
+    init(socket: SocketService = SocketService(), soundService: SoundService = SoundService()) {
         self.socket = socket
+        self.soundService = soundService
         socket.onEvent = { [weak self] event in self?.handle(event) }
         socket.connect()
         if !lobbyCode.isEmpty {
@@ -115,13 +120,13 @@ final class AppModel {
             questionState = state.currentQuestion?.state ?? .unknown; persistIdentity()
             route = state.status == "waiting" ? .lobby : .game
         case .question(let question):
-            currentQuestion = question; questionState = question.state; selectedAnswer = nil; route = .game
+            currentQuestion = question; questionState = question.state; selectedAnswer = nil; route = .game; soundService.play(.questionAlert)
         case .questionState(let state):
             questionState = state.state
             if var question = currentQuestion, question.instanceId == state.instanceId { question.state = state.state; question.answerDeadline = state.answerDeadline; currentQuestion = question }
         case .questionText(let update):
             if var question = currentQuestion, question.instanceId == update.instanceId { question.questionText = update.questionText; currentQuestion = question }
-        case .resolution(let resolution): latestResolution = resolution; route = .game
+        case .resolution(let resolution): latestResolution = resolution; route = .game; soundService.play(resolution.outcome == true ? .correct : .wrong)
         case .leaderboard(let entries): leaderboard = entries
         case .snapshot(let snapshot): self.snapshot = snapshot
         case .sessions(let sessions): self.sessions = sessions

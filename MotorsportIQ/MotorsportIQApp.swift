@@ -80,6 +80,8 @@ struct HomeView: View {
             }
 
             VStack(spacing: 12) {
+                Toggle("Question sounds", isOn: $model.soundsEnabled)
+                    .tint(Color.raceRed)
                 TextField("Your username", text: $model.username)
                     .textInputAutocapitalization(.words)
                     .padding(14)
@@ -205,6 +207,7 @@ struct GameView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        let standings = model.lobbyState?.finalStandings ?? model.leaderboard
         RaceScreen(title: model.lobbyState?.code ?? "Race") {
             RaceHUD(snapshot: model.snapshot)
             if model.feedStalled { Label("Race feed delayed", systemImage: "wifi.exclamationmark").foregroundStyle(.yellow) }
@@ -244,7 +247,7 @@ struct GameView: View {
 
             Text("Leaderboard").font(.title3.bold())
             if model.lobbyState?.status == "finished" { Text("Race complete").font(.title2.bold()).foregroundStyle(Color.raceGreen) }
-            ForEach(Array(model.leaderboard.enumerated()), id: \.element.id) { index, entry in
+            ForEach(Array(standings.enumerated()), id: \.element.id) { index, entry in
                 HStack {
                     Text("\(index + 1)").font(.headline.monospacedDigit()).foregroundStyle(Color.raceMuted).frame(width: 28)
                     Text(entry.username).fontWeight(entry.userId == model.userId ? .bold : .regular)

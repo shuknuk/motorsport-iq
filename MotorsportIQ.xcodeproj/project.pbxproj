@@ -9,6 +9,10 @@
 /* Begin PBXBuildFile section */
 		0B5B2422B783D276DDA2D2BA /* ContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608F59A67B95AE823C44B5A5 /* ContractTests.swift */; };
 		1DD342EFCB0CBF8038B82978 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC94E0A361588660AD76507A /* AppModel.swift */; };
+		3F643A3745549A0565AAF0FF /* correct.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = E854EA11B93E7C5022738BA2 /* correct.mp3 */; };
+		405B2616B214CD61B9729936 /* wrong.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = FAB5131D0253D2E2EBF1D23B /* wrong.mp3 */; };
+		414D43AB26A09A54B92381DC /* SoundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDCEE87E54C9ED6BB47CE9D5 /* SoundService.swift */; };
+		4730960E045064713BCAB887 /* question-alert.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5E493857FBBEFC294E25DBF2 /* question-alert.mp3 */; };
 		5A31F13032CD86F0D5FAC052 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = 556A04C5C2BE82E5DF1A6CF4 /* SocketIO */; };
 		6CE2DA5F4480D376C66AF56D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E3ABF728A3FE69B60C8A69 /* Models.swift */; };
 		B56CAF861AE7D6E19AC4312E /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE18D8F71F1A3EAD1DE7A99 /* LaunchTests.swift */; };
@@ -36,13 +40,17 @@
 /* Begin PBXFileReference section */
 		085171873106FB4955D7E0C2 /* SocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketService.swift; sourceTree = "<group>"; };
 		26C257B8DBDD93F62FB4F3F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5E493857FBBEFC294E25DBF2 /* question-alert.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "question-alert.mp3"; sourceTree = "<group>"; };
 		608F59A67B95AE823C44B5A5 /* ContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractTests.swift; sourceTree = "<group>"; };
 		85548DA950C58F4B1367A53B /* MotorsportIQUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MotorsportIQUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		90E3ABF728A3FE69B60C8A69 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		BC94E0A361588660AD76507A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		C29EE59F6C8EFB3DEBA21E79 /* MotorsportIQApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotorsportIQApp.swift; sourceTree = "<group>"; };
+		CDCEE87E54C9ED6BB47CE9D5 /* SoundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundService.swift; sourceTree = "<group>"; };
 		CEE18D8F71F1A3EAD1DE7A99 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
+		E854EA11B93E7C5022738BA2 /* correct.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = correct.mp3; sourceTree = "<group>"; };
 		EAEBF6033D5063ECFB5E6636 /* MotorsportIQ.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MotorsportIQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FAB5131D0253D2E2EBF1D23B /* wrong.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = wrong.mp3; sourceTree = "<group>"; };
 		FFF6F87DF1A4313966457CA7 /* MotorsportIQTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MotorsportIQTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -58,6 +66,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		028384535D460A52A794AFDA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				56D0EE2AA41A4C98B3A45B26 /* Sounds */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		4CDA5671596FDAADE8948ADB /* MotorsportIQ */ = {
 			isa = PBXGroup;
 			children = (
@@ -66,8 +82,20 @@
 				90E3ABF728A3FE69B60C8A69 /* Models.swift */,
 				C29EE59F6C8EFB3DEBA21E79 /* MotorsportIQApp.swift */,
 				085171873106FB4955D7E0C2 /* SocketService.swift */,
+				CDCEE87E54C9ED6BB47CE9D5 /* SoundService.swift */,
+				028384535D460A52A794AFDA /* Resources */,
 			);
 			path = MotorsportIQ;
+			sourceTree = "<group>";
+		};
+		56D0EE2AA41A4C98B3A45B26 /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				E854EA11B93E7C5022738BA2 /* correct.mp3 */,
+				5E493857FBBEFC294E25DBF2 /* question-alert.mp3 */,
+				FAB5131D0253D2E2EBF1D23B /* wrong.mp3 */,
+			);
+			path = Sounds;
 			sourceTree = "<group>";
 		};
 		A11B6AC81D6ED16B4CDBF341 /* MotorsportIQTests */ = {
@@ -150,6 +178,7 @@
 			buildConfigurationList = D14B6E642B4B4CF015E65898 /* Build configuration list for PBXNativeTarget "MotorsportIQ" */;
 			buildPhases = (
 				312707039A782B7C93BBAA93 /* Sources */,
+				93A8B145203E3CB581438081 /* Resources */,
 				ECA0E45F7E98A7D633DCB11B /* Frameworks */,
 			);
 			buildRules = (
@@ -202,6 +231,19 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		93A8B145203E3CB581438081 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3F643A3745549A0565AAF0FF /* correct.mp3 in Resources */,
+				4730960E045064713BCAB887 /* question-alert.mp3 in Resources */,
+				405B2616B214CD61B9729936 /* wrong.mp3 in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		1A294A1E3F8ABCEA552B9290 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -219,6 +261,7 @@
 				6CE2DA5F4480D376C66AF56D /* Models.swift in Sources */,
 				E298B8C0F3F126D9A73C5BEF /* MotorsportIQApp.swift in Sources */,
 				D9A019698B5E81D3FD042426 /* SocketService.swift in Sources */,
+				414D43AB26A09A54B92381DC /* SoundService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
