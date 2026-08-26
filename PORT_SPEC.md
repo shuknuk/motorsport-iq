@@ -36,3 +36,13 @@ This branch ports the player-facing web flow to SwiftUI while keeping the existi
 3. Replay a solo session through question, answer, resolution, and final standings.
 4. Verify reconnect by killing and relaunching the simulator app while a lobby is active.
 5. Keep signing, APNs, TestFlight, and remote deployment as human approval gates.
+
+## Local run
+
+```bash
+cd /Users/shuknuk/Developer/motorsport-iq-ios
+xcodegen generate
+xcodebuild -project MotorsportIQ.xcodeproj -scheme MotorsportIQ -destination 'platform=iOS Simulator,name=iPhone 14,OS=27.0' build
+```
+
+The default `SOCKET_URL` is `http://localhost:4000`. Override the Xcode build setting for a deployed backend, using an `https://` URL in production. Start the existing backend separately with `cd /Users/shuknuk/Developer/motorsport-iq/backend && npm run dev`.
