@@ -25,7 +25,7 @@ This branch ports the player-facing web flow to SwiftUI while keeping the existi
 | Resolution and leaderboard | P0 |
 | Race snapshot HUD | P0 |
 | Report a problem | P1 |
-| Sounds and reduced-motion behavior | P1 |
+| Sounds and reduced-motion behavior | Done: bundled question/correct/wrong SFX plus toggle |
 | Background push notifications | P1, requires APNs approval and provisioning |
 | Admin dashboard and arcade | Out of v1 |
 
