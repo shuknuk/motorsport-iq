@@ -11,7 +11,6 @@ final class SoundService {
     private var players: [RaceSound: AVAudioPlayer] = [:]
 
     init() {
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         for sound in [RaceSound.questionAlert, .correct, .wrong] {
             guard let url = Bundle.main.url(forResource: sound.rawValue, withExtension: "mp3"), let player = try? AVAudioPlayer(contentsOf: url) else { continue }
             player.prepareToPlay(); players[sound] = player

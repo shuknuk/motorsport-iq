@@ -125,7 +125,7 @@ struct HomeView: View {
                 }
             }
         }
-        .task { model.socket.getSessions() }
+        .task { if !model.isUITest { model.socket.getSessions() } }
     }
 }
 

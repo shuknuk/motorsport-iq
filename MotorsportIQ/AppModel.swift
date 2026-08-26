@@ -28,15 +28,17 @@ final class AppModel {
     var reportReason: ReportReason = .other
     var reportNote = ""
     var reportSubmitted = false
+    private var restoredAnswers: [String: String] = [:]
     var soundsEnabled = UserDefaults.standard.object(forKey: "msp_sounds_enabled") as? Bool ?? true {
         didSet { UserDefaults.standard.set(soundsEnabled, forKey: "msp_sounds_enabled") }
     }
+    var isUITest: Bool { ProcessInfo.processInfo.arguments.contains("--uitest") }
 
     init(socket: SocketService = SocketService(), soundService: SoundService = SoundService()) {
         self.socket = socket
         self.soundService = soundService
         socket.onEvent = { [weak self] event in self?.handle(event) }
-        socket.connect()
+        if !isUITest { socket.connect() }
         if !lobbyCode.isEmpty {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(500))
@@ -112,11 +114,15 @@ final class AppModel {
         case .joinResult(let result):
             userId = result.userId
             if let username = result.username { self.username = username }
+            restoredAnswers.removeAll()
+            selectedAnswer = nil
             persistIdentity()
         case .answersRestored(let restored):
+            restoredAnswers = restored.answers
             if let question = currentQuestion { selectedAnswer = restored.answers[question.instanceId] }
         case .lobbyState(let state):
             lobbyState = state; lobbyCode = state.code; currentQuestion = state.currentQuestion; latestResolution = state.latestResolution; leaderboard = state.leaderboard
+            selectedAnswer = state.currentQuestion.flatMap { restoredAnswers[$0.instanceId] }
             questionState = state.currentQuestion?.state ?? .unknown; persistIdentity()
             route = state.status == "waiting" ? .lobby : .game
         case .question(let question):

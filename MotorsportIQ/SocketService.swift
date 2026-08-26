@@ -92,7 +92,7 @@ final class SocketService {
             default: onEvent?(.simple(event))
             }
         } catch {
-            onEvent?(.error("Could not read (event): (error.localizedDescription)"))
+            onEvent?(.error("Could not read \(event): \(error.localizedDescription)"))
         }
     }
 
