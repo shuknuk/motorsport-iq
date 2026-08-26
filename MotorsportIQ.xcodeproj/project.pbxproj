@@ -1,0 +1,547 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0B5B2422B783D276DDA2D2BA /* ContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608F59A67B95AE823C44B5A5 /* ContractTests.swift */; };
+		1DD342EFCB0CBF8038B82978 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC94E0A361588660AD76507A /* AppModel.swift */; };
+		5A31F13032CD86F0D5FAC052 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = 556A04C5C2BE82E5DF1A6CF4 /* SocketIO */; };
+		6CE2DA5F4480D376C66AF56D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E3ABF728A3FE69B60C8A69 /* Models.swift */; };
+		B56CAF861AE7D6E19AC4312E /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE18D8F71F1A3EAD1DE7A99 /* LaunchTests.swift */; };
+		D9A019698B5E81D3FD042426 /* SocketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 085171873106FB4955D7E0C2 /* SocketService.swift */; };
+		E298B8C0F3F126D9A73C5BEF /* MotorsportIQApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C29EE59F6C8EFB3DEBA21E79 /* MotorsportIQApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		71E53A87C8FEF4DB735E79E8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C7222A319C4213BC7F687416 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 87AC32F3C86D83C78D6D8968;
+			remoteInfo = MotorsportIQ;
+		};
+		98C5E5F79BCA19687E694520 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C7222A319C4213BC7F687416 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 87AC32F3C86D83C78D6D8968;
+			remoteInfo = MotorsportIQ;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		085171873106FB4955D7E0C2 /* SocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketService.swift; sourceTree = "<group>"; };
+		26C257B8DBDD93F62FB4F3F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		608F59A67B95AE823C44B5A5 /* ContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractTests.swift; sourceTree = "<group>"; };
+		85548DA950C58F4B1367A53B /* MotorsportIQUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MotorsportIQUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		90E3ABF728A3FE69B60C8A69 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		BC94E0A361588660AD76507A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		C29EE59F6C8EFB3DEBA21E79 /* MotorsportIQApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotorsportIQApp.swift; sourceTree = "<group>"; };
+		CEE18D8F71F1A3EAD1DE7A99 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
+		EAEBF6033D5063ECFB5E6636 /* MotorsportIQ.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MotorsportIQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FFF6F87DF1A4313966457CA7 /* MotorsportIQTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MotorsportIQTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		ECA0E45F7E98A7D633DCB11B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A31F13032CD86F0D5FAC052 /* SocketIO in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4CDA5671596FDAADE8948ADB /* MotorsportIQ */ = {
+			isa = PBXGroup;
+			children = (
+				BC94E0A361588660AD76507A /* AppModel.swift */,
+				26C257B8DBDD93F62FB4F3F6 /* Info.plist */,
+				90E3ABF728A3FE69B60C8A69 /* Models.swift */,
+				C29EE59F6C8EFB3DEBA21E79 /* MotorsportIQApp.swift */,
+				085171873106FB4955D7E0C2 /* SocketService.swift */,
+			);
+			path = MotorsportIQ;
+			sourceTree = "<group>";
+		};
+		A11B6AC81D6ED16B4CDBF341 /* MotorsportIQTests */ = {
+			isa = PBXGroup;
+			children = (
+				608F59A67B95AE823C44B5A5 /* ContractTests.swift */,
+			);
+			path = MotorsportIQTests;
+			sourceTree = "<group>";
+		};
+		A5F8C26E6427507F4C50ED14 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				EAEBF6033D5063ECFB5E6636 /* MotorsportIQ.app */,
+				FFF6F87DF1A4313966457CA7 /* MotorsportIQTests.xctest */,
+				85548DA950C58F4B1367A53B /* MotorsportIQUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C5FA8236F49E4721CBC2CE2E /* MotorsportIQUITests */ = {
+			isa = PBXGroup;
+			children = (
+				CEE18D8F71F1A3EAD1DE7A99 /* LaunchTests.swift */,
+			);
+			path = MotorsportIQUITests;
+			sourceTree = "<group>";
+		};
+		D1A868991364EA0E3B12EAA7 = {
+			isa = PBXGroup;
+			children = (
+				4CDA5671596FDAADE8948ADB /* MotorsportIQ */,
+				A11B6AC81D6ED16B4CDBF341 /* MotorsportIQTests */,
+				C5FA8236F49E4721CBC2CE2E /* MotorsportIQUITests */,
+				A5F8C26E6427507F4C50ED14 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3BFD490FC138E9C39CDF8623 /* MotorsportIQTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B47D807BF4F36F01F3E82A80 /* Build configuration list for PBXNativeTarget "MotorsportIQTests" */;
+			buildPhases = (
+				A852BDCCD6F1A3BB35E2085A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B01F956698718D48C60FCE32 /* PBXTargetDependency */,
+			);
+			name = MotorsportIQTests;
+			packageProductDependencies = (
+			);
+			productName = MotorsportIQTests;
+			productReference = FFF6F87DF1A4313966457CA7 /* MotorsportIQTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		65A90611DF2D42E694F669F1 /* MotorsportIQUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7EE4188054586D1B51919B4E /* Build configuration list for PBXNativeTarget "MotorsportIQUITests" */;
+			buildPhases = (
+				1A294A1E3F8ABCEA552B9290 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0035B2239C9BB0CA460D9987 /* PBXTargetDependency */,
+			);
+			name = MotorsportIQUITests;
+			packageProductDependencies = (
+			);
+			productName = MotorsportIQUITests;
+			productReference = 85548DA950C58F4B1367A53B /* MotorsportIQUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		87AC32F3C86D83C78D6D8968 /* MotorsportIQ */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D14B6E642B4B4CF015E65898 /* Build configuration list for PBXNativeTarget "MotorsportIQ" */;
+			buildPhases = (
+				312707039A782B7C93BBAA93 /* Sources */,
+				ECA0E45F7E98A7D633DCB11B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MotorsportIQ;
+			packageProductDependencies = (
+				556A04C5C2BE82E5DF1A6CF4 /* SocketIO */,
+			);
+			productName = MotorsportIQ;
+			productReference = EAEBF6033D5063ECFB5E6636 /* MotorsportIQ.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C7222A319C4213BC7F687416 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					65A90611DF2D42E694F669F1 = {
+						TestTargetID = 87AC32F3C86D83C78D6D8968;
+					};
+				};
+			};
+			buildConfigurationList = BD36715188235D35DCF1BE5C /* Build configuration list for PBXProject "MotorsportIQ" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = D1A868991364EA0E3B12EAA7;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A5F8C26E6427507F4C50ED14 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				87AC32F3C86D83C78D6D8968 /* MotorsportIQ */,
+				3BFD490FC138E9C39CDF8623 /* MotorsportIQTests */,
+				65A90611DF2D42E694F669F1 /* MotorsportIQUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1A294A1E3F8ABCEA552B9290 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B56CAF861AE7D6E19AC4312E /* LaunchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		312707039A782B7C93BBAA93 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1DD342EFCB0CBF8038B82978 /* AppModel.swift in Sources */,
+				6CE2DA5F4480D376C66AF56D /* Models.swift in Sources */,
+				E298B8C0F3F126D9A73C5BEF /* MotorsportIQApp.swift in Sources */,
+				D9A019698B5E81D3FD042426 /* SocketService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A852BDCCD6F1A3BB35E2085A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B5B2422B783D276DDA2D2BA /* ContractTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0035B2239C9BB0CA460D9987 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 87AC32F3C86D83C78D6D8968 /* MotorsportIQ */;
+			targetProxy = 71E53A87C8FEF4DB735E79E8 /* PBXContainerItemProxy */;
+		};
+		B01F956698718D48C60FCE32 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 87AC32F3C86D83C78D6D8968 /* MotorsportIQ */;
+			targetProxy = 98C5E5F79BCA19687E694520 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4B1AE142A7CB45A135A27C25 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MotorsportIQ/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Motorsport IQ";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
+				INFOPLIST_KEY_SOCKET_URL = "$(SOCKET_URL)";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.shuknuk.MotorsportIQ;
+				PRODUCT_MODULE_NAME = MotorsportIQ;
+				PRODUCT_NAME = "Motorsport IQ";
+				SDKROOT = iphoneos;
+				SOCKET_URL = "http://localhost:4000";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		51D601CB06DEF0C5735CA3E3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MotorsportIQ;
+			};
+			name = Release;
+		};
+		9372D492F8AA164B35CB99B7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A98505F530B174A317976D50 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MotorsportIQ;
+			};
+			name = Debug;
+		};
+		B55E08F2E004C6B7D70BDE6B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Motorsport IQ.app/Motorsport IQ";
+			};
+			name = Release;
+		};
+		BBA23DFA8806C8170B5B16CE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		C8786324DFD821D4A8172171 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MotorsportIQ/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Motorsport IQ";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
+				INFOPLIST_KEY_SOCKET_URL = "$(SOCKET_URL)";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.shuknuk.MotorsportIQ;
+				PRODUCT_MODULE_NAME = MotorsportIQ;
+				PRODUCT_NAME = "Motorsport IQ";
+				SDKROOT = iphoneos;
+				SOCKET_URL = "http://localhost:4000";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		F4D136CFF2A93D12540CAB1C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Motorsport IQ.app/Motorsport IQ";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7EE4188054586D1B51919B4E /* Build configuration list for PBXNativeTarget "MotorsportIQUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A98505F530B174A317976D50 /* Debug */,
+				51D601CB06DEF0C5735CA3E3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B47D807BF4F36F01F3E82A80 /* Build configuration list for PBXNativeTarget "MotorsportIQTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4D136CFF2A93D12540CAB1C /* Debug */,
+				B55E08F2E004C6B7D70BDE6B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BD36715188235D35DCF1BE5C /* Build configuration list for PBXProject "MotorsportIQ" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9372D492F8AA164B35CB99B7 /* Debug */,
+				BBA23DFA8806C8170B5B16CE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D14B6E642B4B4CF015E65898 /* Build configuration list for PBXNativeTarget "MotorsportIQ" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4B1AE142A7CB45A135A27C25 /* Debug */,
+				C8786324DFD821D4A8172171 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 16.1.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		556A04C5C2BE82E5DF1A6CF4 /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			productName = SocketIO;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = C7222A319C4213BC7F687416 /* Project object */;
+}
