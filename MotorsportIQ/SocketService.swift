@@ -31,8 +31,8 @@ final class SocketService {
         emit("join_lobby", values: ["lobbyCode": code, "username": username, "restoreUserId": restoreUserId])
     }
 
-    func joinSolo(username: String, sessionKey: String, restoreUserId: String? = nil) {
-        emit("join_solo", values: ["username": username, "sessionKey": sessionKey, "restoreUserId": restoreUserId])
+    func joinSolo(username: String, sessionKey: String, restoreUserId: String? = nil, replaySpeed: Double? = nil) {
+        emit("join_solo", values: ["username": username, "sessionKey": sessionKey, "restoreUserId": restoreUserId, "replaySpeed": replaySpeed])
     }
 
     func startSession(lobbyId: String, sessionId: String, userId: String? = nil, replaySpeed: Double? = nil) {

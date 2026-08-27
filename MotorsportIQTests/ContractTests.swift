@@ -16,6 +16,10 @@ final class ContractTests: XCTestCase {
         XCTAssertEqual(Int(deadline.timeIntervalSince(trigger)), 45)
     }
 
+    func testCountdownParsesServerMilliseconds() {
+        XCTAssertNotNil(CountdownView.date(from: "2026-08-26T20:00:00.123Z"))
+    }
+
     func testQuestionAndSnapshotEventsUseServerShapes() throws {
         let questionData = Data(#"{"id":"instance-1","questionId":"q1","questionText":"Will the leader pit?","category":"PIT_WINDOW","difficulty":"EASY","state":"LIVE","windowSize":45,"triggeredAt":"2026-08-26T20:00:00Z"}"#.utf8)
         let question = try JSONDecoder().decode(QuestionEvent.self, from: questionData)

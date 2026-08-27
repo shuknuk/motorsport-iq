@@ -21,6 +21,7 @@ final class AppModel {
     var snapshot: RaceSnapshotEvent?
     var feedStalled = false
     var sessions: [SessionInfo] = []
+    var isLoadingSessions = false
     var selectedAnswer: String?
     var isBusy = false
     var errorMessage: String?
@@ -49,11 +50,13 @@ final class AppModel {
     }
 
     func createLobby() {
+        guard !isBusy else { return }
         guard !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { errorMessage = "Enter a username first."; return }
         persistIdentity(); isBusy = true; socket.createLobby(username: username)
     }
 
     func joinLobby() {
+        guard !isBusy else { return }
         let code = lobbyCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { errorMessage = "Enter a username first."; return }
         guard !code.isEmpty else { errorMessage = "Enter a lobby code."; return }
@@ -61,15 +64,28 @@ final class AppModel {
     }
 
     func joinSolo(_ session: SessionInfo) {
+        guard !isBusy else { return }
         guard let key = session.sessionKey.map(String.init), !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { errorMessage = "Enter a username first."; return }
-        persistIdentity(); isBusy = true; socket.joinSolo(username: username, sessionKey: key, restoreUserId: userId)
+        persistIdentity(); isBusy = true; socket.joinSolo(username: username, sessionKey: key, restoreUserId: userId, replaySpeed: replaySpeed)
+    }
+
+    var replaySpeed: Double = UserDefaults.standard.object(forKey: "msp_replay_speed") as? Double ?? 10 {
+        didSet { UserDefaults.standard.set(replaySpeed, forKey: "msp_replay_speed") }
     }
 
     func startSession(sessionID overrideSessionID: String? = nil) {
+        guard !isBusy else { return }
         guard let lobby = lobbyState else { return }
         let sessionID = overrideSessionID ?? lobby.sessionId ?? sessions.first?.sessionKey.map(String.init)
         guard let sessionID else { return }
+        isBusy = true
         socket.startSession(lobbyId: lobby.id, sessionId: sessionID, userId: userId, replaySpeed: lobby.replaySpeed)
+    }
+
+    func loadSessionsIfNeeded() {
+        guard !isUITest, !isLoadingSessions, sessions.isEmpty else { return }
+        isLoadingSessions = true
+        socket.getSessions()
     }
 
     func submitAnswer(_ answer: String) {
@@ -109,7 +125,6 @@ final class AppModel {
     }
 
     private func handle(_ event: SocketEvent) {
-        isBusy = false
         switch event {
         case .joinResult(let result):
             userId = result.userId
@@ -121,29 +136,37 @@ final class AppModel {
             restoredAnswers = restored.answers
             if let question = currentQuestion { selectedAnswer = restored.answers[question.instanceId] }
         case .lobbyState(let state):
+            isBusy = false
             lobbyState = state; lobbyCode = state.code; currentQuestion = state.currentQuestion; latestResolution = state.latestResolution; leaderboard = state.leaderboard
             selectedAnswer = state.currentQuestion.flatMap { restoredAnswers[$0.instanceId] }
             questionState = state.currentQuestion?.state ?? .unknown; persistIdentity()
             route = state.status == "waiting" ? .lobby : .game
         case .question(let question):
-            currentQuestion = question; questionState = question.state; selectedAnswer = nil; route = .game; soundService.play(.questionAlert)
+            currentQuestion = question; questionState = question.state; selectedAnswer = restoredAnswers[question.instanceId]; route = .game; soundService.play(.questionAlert)
         case .questionState(let state):
             questionState = state.state
-            if var question = currentQuestion, question.instanceId == state.instanceId { question.state = state.state; question.answerDeadline = state.answerDeadline; currentQuestion = question }
+            if var question = currentQuestion, question.instanceId == state.instanceId {
+                question.state = state.state; question.answerDeadline = state.answerDeadline
+                if state.state == .closed || state.state == .cancelled { currentQuestion = nil; selectedAnswer = nil }
+                else { currentQuestion = question }
+            }
         case .questionText(let update):
             if var question = currentQuestion, question.instanceId == update.instanceId { question.questionText = update.questionText; currentQuestion = question }
-        case .resolution(let resolution): latestResolution = resolution; route = .game; soundService.play(resolution.outcome == true ? .correct : .wrong)
+        case .resolution(let resolution):
+            latestResolution = resolution; currentQuestion = nil; selectedAnswer = nil; questionState = .resolved; route = .game; soundService.play(resolution.outcome == true ? .correct : .wrong)
         case .leaderboard(let entries): leaderboard = entries
         case .snapshot(let snapshot): self.snapshot = snapshot
-        case .sessions(let sessions): self.sessions = sessions
+        case .sessions(let sessions): self.sessions = sessions; isLoadingSessions = false
         case .feed(let feed): feedStalled = feed.stalled ?? false
         case .presenceExpired(let expiry):
-            route = .home; errorMessage = "You were removed from the lobby (\(expiry.reason ?? "inactive"))."
+            isBusy = false; lobbyState = nil; currentQuestion = nil; lobbyCode = ""; route = .home
+            UserDefaults.standard.removeObject(forKey: "msp_lobby_code")
+            errorMessage = "You were removed from the lobby (\(expiry.reason ?? "inactive"))."
         case .error(let message):
-            if !message.localizedCaseInsensitiveContains("connect") { errorMessage = message }
+            isBusy = false; isLoadingSessions = false; errorMessage = message
         case .simple(let event):
             if event == "connected" {
-                socket.getSessions()
+                loadSessionsIfNeeded()
                 if lobbyState != nil { socket.reconnectLobby(userId: userId) }
             }
         }

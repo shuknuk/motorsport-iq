@@ -87,16 +87,30 @@ struct HomeView: View {
                     .padding(14)
                     .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 12))
                     .accessibilityLabel("Username")
-                Button("Create lobby", action: model.createLobby)
+                Button(model.isBusy ? "Working…" : "Create lobby", action: model.createLobby)
                     .buttonStyle(RaceButtonStyle())
+                    .disabled(model.isBusy)
                 HStack {
                     TextField("Lobby code", text: $model.lobbyCode)
                         .textInputAutocapitalization(.characters)
                         .padding(14)
                         .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 12))
-                    Button("Join", action: model.joinLobby)
+                    Button(model.isBusy ? "Working…" : "Join", action: model.joinLobby)
                         .buttonStyle(RaceButtonStyle())
+                        .disabled(model.isBusy)
                 }
+            }
+
+            if !model.sessions.isEmpty {
+                Picker("Replay speed", selection: $model.replaySpeed) {
+                    Text("1x").tag(1.0)
+                    Text("10x").tag(10.0)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Replay speed")
+            } else if model.isLoadingSessions {
+                Label("Loading race sessions…", systemImage: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(Color.raceMuted)
             }
 
             if !model.sessions.isEmpty {
@@ -122,10 +136,11 @@ struct HomeView: View {
                         .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
+                    .disabled(model.isBusy)
                 }
             }
         }
-        .task { if !model.isUITest { model.socket.getSessions() } }
+        .task { model.loadSessionsIfNeeded() }
     }
 }
 
@@ -180,7 +195,7 @@ struct LobbyView: View {
                     }
                     Button("Start race") { model.startSession(sessionID: selectedSessionID.isEmpty ? nil : selectedSessionID) }
                         .buttonStyle(RaceButtonStyle())
-                        .disabled(model.sessions.isEmpty && lobby.sessionId == nil)
+                        .disabled(model.isBusy || (model.sessions.isEmpty && lobby.sessionId == nil))
                 } else {
                     Label("Waiting for the host to start", systemImage: "hourglass")
                         .foregroundStyle(Color.raceMuted)
@@ -192,7 +207,7 @@ struct LobbyView: View {
                 ProgressView("Connecting…")
             }
         }
-        .task { model.socket.getSessions() }
+        .task { model.loadSessionsIfNeeded() }
         .onAppear { selectedSessionID = selectedSessionID.isEmpty ? (model.lobbyState?.sessionId ?? model.sessions.first?.sessionKey.map(String.init) ?? "") : selectedSessionID }
         .task {
             while !Task.isCancelled {
@@ -310,15 +325,19 @@ struct AnswerButton: View {
 struct CountdownView: View {
     let deadline: String
     var body: some View {
+        let deadlineDate = Self.date(from: deadline)
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let seconds = max(0, Int((Self.date(from: deadline)?.timeIntervalSince(context.date) ?? 0).rounded(.up)))
+            let seconds = max(0, Int((deadlineDate?.timeIntervalSince(context.date) ?? 0).rounded(.up)))
             Text("\(seconds)s")
                 .font(.headline.monospacedDigit())
                 .foregroundStyle(seconds <= 10 ? Color.raceRed : .white)
-                .accessibilityLabel("(seconds) seconds remaining")
+                .accessibilityLabel("\(seconds) seconds remaining")
         }
     }
-    private static func date(from string: String) -> Date? { ISO8601DateFormatter().date(from: string) }
+    static func date(from string: String) -> Date? {
+        if let date = try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(string) { return date }
+        return try? Date.ISO8601FormatStyle().parse(string)
+    }
 }
 
 struct RaceHUD: View {

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9A17C5E3D1A14F778C7F1B20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9A17C5E3D1A14F778C7F1B21 /* Assets.xcassets */; };
 		0B5B2422B783D276DDA2D2BA /* ContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608F59A67B95AE823C44B5A5 /* ContractTests.swift */; };
 		1DD342EFCB0CBF8038B82978 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC94E0A361588660AD76507A /* AppModel.swift */; };
 		3F643A3745549A0565AAF0FF /* correct.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = E854EA11B93E7C5022738BA2 /* correct.mp3 */; };
@@ -38,6 +39,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		9A17C5E3D1A14F778C7F1B21 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		085171873106FB4955D7E0C2 /* SocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketService.swift; sourceTree = "<group>"; };
 		26C257B8DBDD93F62FB4F3F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5E493857FBBEFC294E25DBF2 /* question-alert.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "question-alert.mp3"; sourceTree = "<group>"; };
@@ -77,6 +79,7 @@
 		4CDA5671596FDAADE8948ADB /* MotorsportIQ */ = {
 			isa = PBXGroup;
 			children = (
+				9A17C5E3D1A14F778C7F1B21 /* Assets.xcassets */,
 				BC94E0A361588660AD76507A /* AppModel.swift */,
 				26C257B8DBDD93F62FB4F3F6 /* Info.plist */,
 				90E3ABF728A3FE69B60C8A69 /* Models.swift */,
@@ -236,6 +239,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9A17C5E3D1A14F778C7F1B20 /* Assets.xcassets in Resources */,
 				3F643A3745549A0565AAF0FF /* correct.mp3 in Resources */,
 				4730960E045064713BCAB887 /* question-alert.mp3 in Resources */,
 				405B2616B214CD61B9729936 /* wrong.mp3 in Resources */,
@@ -309,7 +313,7 @@
 				PRODUCT_MODULE_NAME = MotorsportIQ;
 				PRODUCT_NAME = "Motorsport IQ";
 				SDKROOT = iphoneos;
-				SOCKET_URL = "http://localhost:4000";
+				SOCKET_URL = "https://motorsport-iq-backend.onrender.com";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -320,6 +324,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -329,6 +334,7 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = MotorsportIQ;
+				PRODUCT_BUNDLE_IDENTIFIER = org.shuknuk.MotorsportIQUITests;
 			};
 			name = Release;
 		};
@@ -399,6 +405,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -408,6 +415,7 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = MotorsportIQ;
+				PRODUCT_BUNDLE_IDENTIFIER = org.shuknuk.MotorsportIQUITests;
 			};
 			name = Debug;
 		};
@@ -415,6 +423,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -424,6 +433,7 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Motorsport IQ.app/Motorsport IQ";
+				PRODUCT_BUNDLE_IDENTIFIER = org.shuknuk.MotorsportIQTests;
 			};
 			name = Release;
 		};
@@ -503,7 +513,7 @@
 				PRODUCT_MODULE_NAME = MotorsportIQ;
 				PRODUCT_NAME = "Motorsport IQ";
 				SDKROOT = iphoneos;
-				SOCKET_URL = "http://localhost:4000";
+				SOCKET_URL = "https://motorsport-iq-backend.onrender.com";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -514,6 +524,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -523,6 +534,7 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Motorsport IQ.app/Motorsport IQ";
+				PRODUCT_BUNDLE_IDENTIFIER = org.shuknuk.MotorsportIQTests;
 			};
 			name = Debug;
 		};

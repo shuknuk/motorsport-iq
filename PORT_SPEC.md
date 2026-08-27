@@ -57,4 +57,4 @@ xcodegen generate
 xcodebuild -project MotorsportIQ.xcodeproj -scheme MotorsportIQ -destination 'platform=iOS Simulator,name=iPhone 14,OS=27.0' build
 ```
 
-The default `SOCKET_URL` is `http://localhost:4000`. Override the Xcode build setting for a deployed backend, using an `https://` URL in production. Start the existing backend separately with `cd /Users/shuknuk/Developer/motorsport-iq/backend && npm run dev`.
+The default `SOCKET_URL` is the deployed Render backend so a device launched directly from Xcode can connect. Override the Xcode build setting with `http://localhost:4000` when running a local backend: `cd /Users/shuknuk/Developer/motorsport-iq/backend && npm run dev`.
