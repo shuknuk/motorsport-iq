@@ -97,11 +97,13 @@ final class SocketService {
             case "race_snapshot_update": onEvent?(.snapshot(try decoder.decode(RaceSnapshotEvent.self, from: data)))
             case "sessions_list": onEvent?(.sessions(try decoder.decode([SessionInfo].self, from: data)))
             case "feed_status": onEvent?(.feed(try decoder.decode(FeedStatus.self, from: data)))
-            case "error": onEvent?(.error(Self.errorMessage(from: data)))
+            case "error":
+                let payload = Self.errorPayload(from: data)
+                onEvent?(.error(payload.message, code: payload.code))
             default: onEvent?(.simple(event))
             }
         } catch {
-            onEvent?(.error("Could not read \(event): \(error.localizedDescription)"))
+            onEvent?(.error("Could not read \(event): \(error.localizedDescription)", code: nil))
         }
     }
 
@@ -113,9 +115,14 @@ final class SocketService {
         return nil
     }
 
-    private static func errorMessage(from data: Data) -> String {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return String(data: data, encoding: .utf8) ?? "Socket error" }
-        return (json["message"] as? String) ?? (json["error"] as? String) ?? "Socket error"
+    private static func errorPayload(from data: Data) -> (message: String, code: String?) {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return (String(data: data, encoding: .utf8) ?? "Socket error", nil)
+        }
+        return (
+            (json["message"] as? String) ?? (json["error"] as? String) ?? "Socket error",
+            json["code"] as? String
+        )
     }
 
     private func flushPending() {

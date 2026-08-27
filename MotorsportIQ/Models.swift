@@ -278,6 +278,6 @@ enum SocketEvent: Sendable {
     case snapshot(RaceSnapshotEvent)
     case sessions([SessionInfo])
     case feed(FeedStatus)
-    case error(String)
+    case error(String, code: String?)
     case simple(String)
 }

@@ -96,8 +96,7 @@ final class AppModel {
     }
 
     func leaveLobby() {
-        socket.leaveLobby(); lobbyState = nil; currentQuestion = nil; latestResolution = nil; leaderboard = []; lobbyCode = ""; route = .home
-        UserDefaults.standard.removeObject(forKey: "msp_lobby_code")
+        socket.leaveLobby(); clearLocalLobbyState()
     }
 
     func submitReport() {
@@ -161,11 +160,16 @@ final class AppModel {
         case .sessions(let sessions): self.sessions = sessions; isLoadingSessions = false; isCheckingRenderConnection = false
         case .feed(let feed): feedStalled = feed.stalled ?? false
         case .presenceExpired(let expiry):
-            isBusy = false; lobbyState = nil; currentQuestion = nil; lobbyCode = ""; route = .home
-            UserDefaults.standard.removeObject(forKey: "msp_lobby_code")
+            isBusy = false; clearLocalLobbyState()
             errorMessage = "You were removed from the lobby (\(expiry.reason ?? "inactive"))."
-        case .error(let message):
-            isBusy = false; isLoadingSessions = false; isCheckingRenderConnection = false; errorMessage = message
+        case .error(let message, let code):
+            isBusy = false; isLoadingSessions = false; isCheckingRenderConnection = false
+            if code == "SESSION_EXPIRED" || message.localizedCaseInsensitiveContains("session expired") {
+                clearLocalLobbyState()
+                errorMessage = "Your previous lobby expired. Join or create a new lobby."
+            } else {
+                errorMessage = message
+            }
         case .simple(let event):
             if event == "connected" {
                 isCheckingRenderConnection = false
@@ -175,5 +179,18 @@ final class AppModel {
                 isCheckingRenderConnection = true
             }
         }
+    }
+
+    private func clearLocalLobbyState() {
+        lobbyState = nil
+        currentQuestion = nil
+        latestResolution = nil
+        leaderboard = []
+        snapshot = nil
+        selectedAnswer = nil
+        questionState = .unknown
+        lobbyCode = ""
+        route = .home
+        UserDefaults.standard.removeObject(forKey: "msp_lobby_code")
     }
 }
