@@ -22,6 +22,7 @@ final class AppModel {
     var feedStalled = false
     var sessions: [SessionInfo] = []
     var isLoadingSessions = false
+    var isCheckingRenderConnection = false
     var selectedAnswer: String?
     var isBusy = false
     var errorMessage: String?
@@ -85,6 +86,7 @@ final class AppModel {
     func loadSessionsIfNeeded() {
         guard !isUITest, !isLoadingSessions, sessions.isEmpty else { return }
         isLoadingSessions = true
+        isCheckingRenderConnection = !socket.isConnected
         socket.getSessions()
     }
 
@@ -156,18 +158,21 @@ final class AppModel {
             latestResolution = resolution; currentQuestion = nil; selectedAnswer = nil; questionState = .resolved; route = .game; soundService.play(resolution.outcome == true ? .correct : .wrong)
         case .leaderboard(let entries): leaderboard = entries
         case .snapshot(let snapshot): self.snapshot = snapshot
-        case .sessions(let sessions): self.sessions = sessions; isLoadingSessions = false
+        case .sessions(let sessions): self.sessions = sessions; isLoadingSessions = false; isCheckingRenderConnection = false
         case .feed(let feed): feedStalled = feed.stalled ?? false
         case .presenceExpired(let expiry):
             isBusy = false; lobbyState = nil; currentQuestion = nil; lobbyCode = ""; route = .home
             UserDefaults.standard.removeObject(forKey: "msp_lobby_code")
             errorMessage = "You were removed from the lobby (\(expiry.reason ?? "inactive"))."
         case .error(let message):
-            isBusy = false; isLoadingSessions = false; errorMessage = message
+            isBusy = false; isLoadingSessions = false; isCheckingRenderConnection = false; errorMessage = message
         case .simple(let event):
             if event == "connected" {
+                isCheckingRenderConnection = false
                 loadSessionsIfNeeded()
                 if lobbyState != nil { socket.reconnectLobby(userId: userId) }
+            } else if event == "connecting" && isLoadingSessions {
+                isCheckingRenderConnection = true
             }
         }
     }

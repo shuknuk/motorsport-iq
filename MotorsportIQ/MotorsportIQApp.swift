@@ -109,7 +109,10 @@ struct HomeView: View {
                 .pickerStyle(.segmented)
                 .accessibilityLabel("Replay speed")
             } else if model.isLoadingSessions {
-                Label("Loading race sessions…", systemImage: "arrow.triangle.2.circlepath")
+                Label(
+                    model.isCheckingRenderConnection ? "Checking Render connection live…" : "Loading race sessions…",
+                    systemImage: model.isCheckingRenderConnection ? "antenna.radiowaves.left.and.right" : "arrow.triangle.2.circlepath"
+                )
                     .foregroundStyle(Color.raceMuted)
             }
 

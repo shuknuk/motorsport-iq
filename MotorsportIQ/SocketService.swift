@@ -9,6 +9,8 @@ final class SocketService {
     private var pendingEmits: [(String, [String: Any])] = []
     var onEvent: ((SocketEvent) -> Void)?
 
+    var isConnected: Bool { socket.status == .connected }
+
     init(baseURL: URL = SocketService.defaultURL) {
         self.baseURL = baseURL
         manager = SocketManager(socketURL: baseURL, config: [.log(false), .compress, .reconnects(true), .reconnectAttempts(-1), .reconnectWait(1), .forceNew(true)])
@@ -60,6 +62,13 @@ final class SocketService {
     private func registerHandlers() {
         socket.on(clientEvent: .connect) { [weak self] _, _ in
             Task { @MainActor [weak self] in self?.flushPending() }
+        }
+        socket.on(clientEvent: .statusChange) { [weak self] values, _ in
+            guard let status = values.first as? SocketIOStatus else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if status == .connecting { self.onEvent?(.simple("connecting")) }
+            }
         }
         let events = ["lobby_state", "question_event", "question_state", "question_text_update", "resolution_event", "leaderboard_update", "race_snapshot_update", "sessions_list", "feed_status", "error", "session_started", "question_locked", "question_cancelled", "answers_restored", "join_result", "presence_expired"]
         for event in events {
