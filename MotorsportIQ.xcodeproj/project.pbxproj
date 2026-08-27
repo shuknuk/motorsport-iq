@@ -51,7 +51,7 @@
 		CDCEE87E54C9ED6BB47CE9D5 /* SoundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundService.swift; sourceTree = "<group>"; };
 		CEE18D8F71F1A3EAD1DE7A99 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		E854EA11B93E7C5022738BA2 /* correct.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = correct.mp3; sourceTree = "<group>"; };
-		EAEBF6033D5063ECFB5E6636 /* MotorsportIQ.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MotorsportIQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EAEBF6033D5063ECFB5E6636 /* Motorsport IQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Motorsport IQ.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAB5131D0253D2E2EBF1D23B /* wrong.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = wrong.mp3; sourceTree = "<group>"; };
 		FFF6F87DF1A4313966457CA7 /* MotorsportIQTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MotorsportIQTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -112,7 +112,7 @@
 		A5F8C26E6427507F4C50ED14 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				EAEBF6033D5063ECFB5E6636 /* MotorsportIQ.app */,
+				EAEBF6033D5063ECFB5E6636 /* Motorsport IQ.app */,
 				FFF6F87DF1A4313966457CA7 /* MotorsportIQTests.xctest */,
 				85548DA950C58F4B1367A53B /* MotorsportIQUITests.xctest */,
 			);
@@ -193,7 +193,7 @@
 				556A04C5C2BE82E5DF1A6CF4 /* SocketIO */,
 			);
 			productName = MotorsportIQ;
-			productReference = EAEBF6033D5063ECFB5E6636 /* MotorsportIQ.app */;
+			productReference = EAEBF6033D5063ECFB5E6636 /* Motorsport IQ.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -220,7 +220,7 @@
 			mainGroup = D1A868991364EA0E3B12EAA7;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+				06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A5F8C26E6427507F4C50ED14 /* Products */;
@@ -298,6 +298,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 95XU88345H;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MotorsportIQ/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Motorsport IQ";
@@ -498,6 +499,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 95XU88345H;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MotorsportIQ/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Motorsport IQ";
@@ -580,7 +582,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+		06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
 			requirement = {
@@ -593,7 +595,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		556A04C5C2BE82E5DF1A6CF4 /* SocketIO */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			package = 06910AA66AACD43250FDBAB7 /* XCRemoteSwiftPackageReference "socket" */;
 			productName = SocketIO;
 		};
 /* End XCSwiftPackageProductDependency section */

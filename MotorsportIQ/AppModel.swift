@@ -30,6 +30,7 @@ final class AppModel {
     var reportReason: ReportReason = .other
     var reportNote = ""
     var reportSubmitted = false
+    private var reportInstanceId: String?
     private var restoredAnswers: [String: String] = [:]
     var soundsEnabled = UserDefaults.standard.object(forKey: "msp_sounds_enabled") as? Bool ?? true {
         didSet { UserDefaults.standard.set(soundsEnabled, forKey: "msp_sounds_enabled") }
@@ -80,7 +81,7 @@ final class AppModel {
         let sessionID = overrideSessionID ?? lobby.sessionId ?? sessions.first?.sessionKey.map(String.init)
         guard let sessionID else { return }
         isBusy = true
-        socket.startSession(lobbyId: lobby.id, sessionId: sessionID, userId: userId, replaySpeed: lobby.replaySpeed)
+        socket.startSession(lobbyId: lobby.id, sessionId: sessionID, userId: userId, replaySpeed: replaySpeed)
     }
 
     func loadSessionsIfNeeded() {
@@ -91,7 +92,7 @@ final class AppModel {
     }
 
     func submitAnswer(_ answer: String) {
-        guard let question = currentQuestion, selectedAnswer == nil else { return }
+        guard let question = currentQuestion, question.state == .live, selectedAnswer == nil else { return }
         selectedAnswer = answer; socket.submitAnswer(instanceId: question.instanceId, answer: answer)
     }
 
@@ -100,7 +101,7 @@ final class AppModel {
     }
 
     func submitReport() {
-        guard let instanceId = currentQuestion?.instanceId, let url = URL(string: "/reports", relativeTo: socket.baseURL) else { return }
+        guard let instanceId = reportInstanceId, let url = URL(string: "/reports", relativeTo: socket.baseURL) else { return }
         var request = URLRequest(url: url); request.httpMethod = "POST"; request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["instanceId": instanceId, "userId": userId, "reason": reportReason.rawValue, "note": reportNote])
         Task { @MainActor [weak self] in
@@ -139,11 +140,13 @@ final class AppModel {
         case .lobbyState(let state):
             isBusy = false
             lobbyState = state; lobbyCode = state.code; currentQuestion = state.currentQuestion; latestResolution = state.latestResolution; leaderboard = state.leaderboard
+            if state.currentQuestion != nil { latestResolution = nil }
+            reportInstanceId = state.currentQuestion?.instanceId ?? state.latestResolution?.instanceId
             selectedAnswer = state.currentQuestion.flatMap { restoredAnswers[$0.instanceId] }
             questionState = state.currentQuestion?.state ?? .unknown; persistIdentity()
             route = state.status == "waiting" ? .lobby : .game
         case .question(let question):
-            currentQuestion = question; questionState = question.state; selectedAnswer = restoredAnswers[question.instanceId]; route = .game; soundService.play(.questionAlert)
+            currentQuestion = question; reportInstanceId = question.instanceId; latestResolution = nil; questionState = question.state; selectedAnswer = restoredAnswers[question.instanceId]; route = .game; soundService.play(.questionAlert)
         case .questionState(let state):
             questionState = state.state
             if var question = currentQuestion, question.instanceId == state.instanceId {
@@ -154,7 +157,7 @@ final class AppModel {
         case .questionText(let update):
             if var question = currentQuestion, question.instanceId == update.instanceId { question.questionText = update.questionText; currentQuestion = question }
         case .resolution(let resolution):
-            latestResolution = resolution; currentQuestion = nil; selectedAnswer = nil; questionState = .resolved; route = .game; soundService.play(resolution.outcome == true ? .correct : .wrong)
+            latestResolution = resolution; reportInstanceId = resolution.instanceId; currentQuestion = nil; selectedAnswer = nil; questionState = .resolved; route = .game; soundService.play(resolution.outcome == true ? .correct : .wrong)
         case .leaderboard(let entries): leaderboard = entries
         case .snapshot(let snapshot): self.snapshot = snapshot
         case .sessions(let sessions): self.sessions = sessions; isLoadingSessions = false; isCheckingRenderConnection = false
@@ -189,6 +192,7 @@ final class AppModel {
         snapshot = nil
         selectedAnswer = nil
         questionState = .unknown
+        reportInstanceId = nil
         lobbyCode = ""
         route = .home
         UserDefaults.standard.removeObject(forKey: "msp_lobby_code")

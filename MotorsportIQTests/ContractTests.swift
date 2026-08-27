@@ -31,4 +31,11 @@ final class ContractTests: XCTestCase {
         XCTAssertEqual(snapshot.lapNumber, 12)
         XCTAssertEqual(snapshot.topThree?.first, "L. Norris")
     }
+
+    func testExpiredQuestionWaitsForResolution() throws {
+        let data = Data(#"{"instanceId":"instance-1","questionText":"Will the leader pit?","category":"PIT_WINDOW","state":"LOCKED"}"#.utf8)
+        let question = try JSONDecoder().decode(QuestionEvent.self, from: data)
+        XCTAssertTrue(question.state.isAwaitingResolution)
+        XCTAssertFalse(question.state == .live)
+    }
 }

@@ -43,23 +43,65 @@ extension Color {
     static let raceElevated = Color(red: 0.102, green: 0.122, blue: 0.169)
     static let raceRed = Color(red: 1, green: 0.129, blue: 0.078)
     static let raceGreen = Color(red: 0.122, green: 0.824, blue: 0.478)
+    static let raceWarning = Color(red: 1, green: 0.76, blue: 0.12)
     static let raceMuted = Color(red: 0.604, green: 0.651, blue: 0.722)
 }
 
 struct RaceScreen<Content: View>: View {
     let title: String
+    let trailingAction: (() -> Void)?
     @ViewBuilder let content: () -> Content
+
+    init(title: String, trailingAction: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.trailingAction = trailingAction
+        self.content = content
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) { content() }
-                    .padding(20)
+                VStack(alignment: .leading, spacing: 20) { content() }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
             }
             .background(Color.raceBackground.ignoresSafeArea())
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.raceBackground, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                if let trailingAction {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Leave", role: .destructive, action: trailingAction)
+                            .accessibilityLabel("Leave race")
+                    }
+                }
+            }
         }
+    }
+}
+
+struct RacePanel<Content: View>: View {
+    let padding: CGFloat
+    @ViewBuilder let content: () -> Content
+
+    init(padding: CGFloat = 16, @ViewBuilder content: @escaping () -> Content) {
+        self.padding = padding
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(.white.opacity(0.08), lineWidth: 1)
+            }
     }
 }
 
@@ -69,78 +111,130 @@ struct HomeView: View {
     var body: some View {
         @Bindable var model = model
         RaceScreen(title: "Motorsport IQ") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("RACE NIGHT")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.raceRed)
-                Text("Predict the race.")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
-                Text("Join a lobby and answer live Formula 1 questions before the clock runs out.")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Rectangle()
+                        .fill(Color.raceRed)
+                        .frame(width: 4, height: 18)
+                    Text("LIVE F1 PREDICTIONS")
+                        .font(.caption.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(Color.raceRed)
+                }
+                Text("Read the race.\nBeat your mates.")
+                    .font(.system(.largeTitle, design: .rounded).weight(.black))
+                    .tracking(-0.8)
+                    .lineSpacing(-2)
+                Text("A watch-party game for people who actually watch the race.")
+                    .font(.body)
                     .foregroundStyle(Color.raceMuted)
             }
 
-            VStack(spacing: 12) {
-                Toggle("Question sounds", isOn: $model.soundsEnabled)
-                    .tint(Color.raceRed)
-                TextField("Your username", text: $model.username)
-                    .textInputAutocapitalization(.words)
-                    .padding(14)
-                    .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 12))
-                    .accessibilityLabel("Username")
-                Button(model.isBusy ? "Working…" : "Create lobby", action: model.createLobby)
-                    .buttonStyle(RaceButtonStyle())
-                    .disabled(model.isBusy)
-                HStack {
-                    TextField("Lobby code", text: $model.lobbyCode)
-                        .textInputAutocapitalization(.characters)
-                        .padding(14)
-                        .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 12))
-                    Button(model.isBusy ? "Working…" : "Join", action: model.joinLobby)
+            RacePanel {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Join a race")
+                            .font(.title3.bold())
+                        Text("Create a lobby or enter a code from a friend.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.raceMuted)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Driver name")
+                            .font(.subheadline.weight(.semibold))
+                        TextField("Your name", text: $model.username)
+                            .textInputAutocapitalization(.words)
+                            .textFieldStyle(.plain)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 50)
+                            .background(Color.raceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .accessibilityLabel("Driver name")
+                    }
+
+                    Button(model.isBusy ? "Working…" : "Create lobby", action: model.createLobby)
                         .buttonStyle(RaceButtonStyle())
                         .disabled(model.isBusy)
+
+                    HStack(spacing: 10) {
+                        Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
+                        Text("OR")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Color.raceMuted)
+                        Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Lobby code")
+                            .font(.subheadline.weight(.semibold))
+                        HStack(spacing: 8) {
+                            TextField("ABC123", text: $model.lobbyCode)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .textFieldStyle(.plain)
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 50)
+                                .background(Color.raceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .accessibilityLabel("Lobby code")
+                            Button(model.isBusy ? "Working…" : "Join", action: model.joinLobby)
+                                .buttonStyle(RaceButtonStyle())
+                                .frame(maxWidth: 110)
+                                .disabled(model.isBusy)
+                        }
+                    }
                 }
             }
 
+            Toggle("Question sounds", isOn: $model.soundsEnabled)
+                .tint(Color.raceRed)
+                .padding(.horizontal, 4)
+
             if !model.sessions.isEmpty {
-                Picker("Replay speed", selection: $model.replaySpeed) {
-                    Text("1x").tag(1.0)
-                    Text("10x").tag(10.0)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Practice a replay")
+                        .font(.title3.bold())
+                    RacePanel(padding: 12) {
+                        VStack(spacing: 12) {
+                            Picker("Replay speed", selection: $model.replaySpeed) {
+                                Text("1x").tag(1.0)
+                                Text("10x").tag(10.0)
+                            }
+                            .pickerStyle(.segmented)
+                            .accessibilityLabel("Replay speed")
+
+                            ForEach(model.sessions) { session in
+                                Button {
+                                    model.joinSolo(session)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(session.sessionName ?? session.location ?? "Race session")
+                                                .font(.headline)
+                                                .foregroundStyle(.white)
+                                            Text(session.countryName ?? "OpenF1 replay")
+                                                .font(.subheadline)
+                                                .foregroundStyle(Color.raceMuted)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(Color.raceMuted)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(model.isBusy)
+                            }
+                        }
+                    }
                 }
-                .pickerStyle(.segmented)
-                .accessibilityLabel("Replay speed")
             } else if model.isLoadingSessions {
                 Label(
                     model.isCheckingRenderConnection ? "Checking Render connection live…" : "Loading race sessions…",
                     systemImage: model.isCheckingRenderConnection ? "antenna.radiowaves.left.and.right" : "arrow.triangle.2.circlepath"
                 )
                     .foregroundStyle(Color.raceMuted)
-            }
-
-            if !model.sessions.isEmpty {
-                Text("Solo replay")
-                    .font(.title3.bold())
-                ForEach(model.sessions) { session in
-                    Button {
-                        model.joinSolo(session)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(session.sessionName ?? session.location ?? "Race session")
-                                    .font(.headline)
-                                    .foregroundStyle(.white)
-                                Text(session.countryName ?? "OpenF1 replay")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.raceMuted)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                        }
-                        .padding(14)
-                        .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(model.isBusy)
-                }
             }
         }
         .task { model.loadSessionsIfNeeded() }
@@ -154,7 +248,8 @@ struct RaceButtonStyle: ButtonStyle {
             .frame(minHeight: 48)
             .frame(maxWidth: .infinity)
             .foregroundStyle(.white)
-            .background(configuration.isPressed ? Color.raceRed.opacity(0.7) : Color.raceRed, in: RoundedRectangle(cornerRadius: 12))
+            .opacity(configuration.isPressed ? 0.78 : 1)
+            .background(Color.raceRed, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -166,26 +261,62 @@ struct LobbyView: View {
         RaceScreen(title: "Lobby") {
             if let lobby = model.lobbyState {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("LOBBY CODE").font(.caption.weight(.bold)).foregroundStyle(Color.raceMuted)
-                    Text(lobby.code).font(.system(size: 40, weight: .black, design: .monospaced)).tracking(5)
-                    if let url = lobby.shareUrl, let shareURL = URL(string: url) { ShareLink(item: shareURL) { Label("Share lobby", systemImage: "square.and.arrow.up") } }
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 16))
-
-                Text("Players").font(.title3.bold())
-                ForEach(lobby.players) { player in
-                    HStack {
-                        Circle().fill(player.connected ? Color.raceGreen : Color.raceMuted).frame(width: 9, height: 9)
-                        Text(player.username)
-                        if player.id == model.userId { Text("YOU").font(.caption2.bold()).foregroundStyle(Color.raceRed) }
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("LOBBY CODE")
+                                .font(.caption.weight(.bold))
+                                .tracking(1.1)
+                                .foregroundStyle(Color.raceMuted)
+                            Text(lobby.code)
+                                .font(.system(size: 40, weight: .black, design: .monospaced))
+                                .tracking(5)
+                        }
                         Spacer()
-                        if player.isHost { Image(systemName: "crown.fill").foregroundStyle(.yellow) }
+                        if let url = lobby.shareUrl, let shareURL = URL(string: url) {
+                            ShareLink(item: shareURL) {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                            .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityLabel("Share lobby")
+                        }
                     }
-                    .padding(12)
-                    .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 10))
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(.white.opacity(0.08), lineWidth: 1)
+                }
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Players")
+                        .font(.title3.bold())
+                        .padding(.bottom, 8)
+                    ForEach(Array(lobby.players.enumerated()), id: \.element.id) { index, player in
+                        if index > 0 { Divider().overlay(.white.opacity(0.08)) }
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(player.connected ? Color.raceGreen : Color.raceMuted)
+                                .frame(width: 8, height: 8)
+                            Text(player.username)
+                            if player.id == model.userId {
+                                Text("YOU")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(Color.raceRed)
+                            }
+                            Spacer()
+                            if player.isHost {
+                                Image(systemName: "crown.fill")
+                                    .foregroundStyle(.yellow)
+                                    .accessibilityLabel("Host")
+                            }
+                        }
+                        .frame(minHeight: 44)
+                    }
+                }
+                .padding(.horizontal, 4)
 
                 if lobby.hostId == model.userId || lobby.players.first(where: { $0.id == model.userId })?.isHost == true {
                     if !model.sessions.isEmpty {
@@ -195,6 +326,7 @@ struct LobbyView: View {
                             }
                         }
                         .pickerStyle(.menu)
+                        .frame(minHeight: 44)
                     }
                     Button("Start race") { model.startSession(sessionID: selectedSessionID.isEmpty ? nil : selectedSessionID) }
                         .buttonStyle(RaceButtonStyle())
@@ -205,9 +337,11 @@ struct LobbyView: View {
                         .frame(maxWidth: .infinity)
                 }
                 Button("Leave lobby", role: .destructive, action: model.leaveLobby)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             } else {
-                ProgressView("Connecting…")
+                RacePanel {
+                    ProgressView("Connecting…")
+                }
             }
         }
         .task { model.loadSessionsIfNeeded() }
@@ -223,63 +357,133 @@ struct LobbyView: View {
 
 struct GameView: View {
     @Environment(AppModel.self) private var model
+    @State private var showLeaveConfirmation = false
 
     var body: some View {
         let standings = model.lobbyState?.finalStandings ?? model.leaderboard
-        RaceScreen(title: model.lobbyState?.code ?? "Race") {
+        RaceScreen(title: model.lobbyState?.code ?? "Race", trailingAction: { showLeaveConfirmation = true }) {
             RaceHUD(snapshot: model.snapshot)
-            if model.feedStalled { Label("Race feed delayed", systemImage: "wifi.exclamationmark").foregroundStyle(.yellow) }
+            if model.feedStalled {
+                Label("Race feed delayed", systemImage: "wifi.exclamationmark")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.raceWarning)
+            }
             if let question = model.currentQuestion {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Text(question.category.rawValue.replacingOccurrences(of: "_", with: " "))
-                            .font(.caption.bold()).foregroundStyle(Color.raceRed)
-                        Spacer()
-                        if let deadline = question.answerDeadline { CountdownView(deadline: deadline) }
+                let questionState = question.state
+                RacePanel {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(question.category.rawValue.replacingOccurrences(of: "_", with: " "))
+                                .font(.caption.weight(.bold))
+                                .tracking(1)
+                                .foregroundStyle(Color.raceRed)
+                            Spacer()
+                            if let deadline = question.answerDeadline { CountdownView(deadline: deadline) }
+                        }
+                        Text(question.questionText)
+                            .font(.title2.bold())
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let context = question.questionContext, let lap = context.triggerLap {
+                            Text("Triggered on lap \(lap)")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.raceMuted)
+                        }
+                        if questionState == .live {
+                            HStack(spacing: 12) {
+                                AnswerButton(title: "YES", color: Color.raceGreen, disabled: model.selectedAnswer != nil) { model.submitAnswer("YES") }
+                                AnswerButton(title: "NO", color: Color.raceRed, disabled: model.selectedAnswer != nil) { model.submitAnswer("NO") }
+                            }
+                        } else if questionState.isAwaitingResolution {
+                            Label("Waiting for final answer…", systemImage: "hourglass")
+                                .font(.headline)
+                                .foregroundStyle(Color.raceMuted)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        if let selected = model.selectedAnswer {
+                            Label("Answer submitted: \(selected)", systemImage: "checkmark.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.raceMuted)
+                        }
                     }
-                    Text(question.questionText).font(.title2.bold())
-                    if let context = question.questionContext, let lap = context.triggerLap { Text("Triggered on lap \(lap)").foregroundStyle(Color.raceMuted) }
-                    HStack(spacing: 12) {
-                        AnswerButton(title: "YES", color: Color.raceGreen, disabled: model.selectedAnswer != nil || !canAnswer(question)) { model.submitAnswer("YES") }
-                        AnswerButton(title: "NO", color: Color.raceRed, disabled: model.selectedAnswer != nil || !canAnswer(question)) { model.submitAnswer("NO") }
-                    }
-                    if let selected = model.selectedAnswer { Text("Answer submitted: \(selected)").font(.subheadline).foregroundStyle(Color.raceMuted) }
                 }
-                .padding(16)
-                .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 16))
             } else {
-                Text("Waiting for the next question…").foregroundStyle(Color.raceMuted)
+                RacePanel {
+                    Label("Waiting for the next question…", systemImage: "clock")
+                        .foregroundStyle(Color.raceMuted)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
             }
 
             if let resolution = model.latestResolution {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(resolution.outcome == true ? "Correct" : "Resolution")
+                RacePanel {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(
+                            resolution.outcome == true ? "Correct" : "Resolution",
+                            systemImage: resolution.outcome == true ? "checkmark.circle.fill" : "xmark.circle.fill"
+                        )
                         .font(.title3.bold())
                         .foregroundStyle(resolution.outcome == true ? Color.raceGreen : Color.raceRed)
-                    if let explanation = resolution.explanation { Text(explanation) }
+                        if let explanation = resolution.explanation {
+                            Text(explanation)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.raceElevated, in: RoundedRectangle(cornerRadius: 16))
             }
 
-            Text("Leaderboard").font(.title3.bold())
-            if model.lobbyState?.status == "finished" { Text("Race complete").font(.title2.bold()).foregroundStyle(Color.raceGreen) }
-            ForEach(Array(standings.enumerated()), id: \.element.id) { index, entry in
-                HStack {
-                    Text("\(index + 1)").font(.headline.monospacedDigit()).foregroundStyle(Color.raceMuted).frame(width: 28)
-                    Text(entry.username).fontWeight(entry.userId == model.userId ? .bold : .regular)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Leaderboard")
+                        .font(.title3.bold())
                     Spacer()
-                    Text("\(entry.points) pts").font(.headline.monospacedDigit())
+                    if model.lobbyState?.status == "finished" {
+                        Text("Race complete")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Color.raceGreen)
+                    }
                 }
-                .padding(12)
-                .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 10))
+                RacePanel(padding: 12) {
+                    if standings.isEmpty {
+                        Text("Scores will appear after the first answer.")
+                            .foregroundStyle(Color.raceMuted)
+                            .frame(minHeight: 44, alignment: .leading)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(standings.enumerated()), id: \.element.id) { index, entry in
+                                if index > 0 { Divider().overlay(.white.opacity(0.08)) }
+                                HStack(spacing: 12) {
+                                    Text("\(index + 1)")
+                                        .font(.headline.monospacedDigit())
+                                        .foregroundStyle(Color.raceMuted)
+                                        .frame(width: 28)
+                                    Text(entry.username)
+                                        .fontWeight(entry.userId == model.userId ? .bold : .regular)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text("\(entry.points) pts")
+                                        .font(.headline.monospacedDigit())
+                                }
+                                .frame(minHeight: 44)
+                            }
+                        }
+                    }
+                }
             }
 
-            Button { model.showReport = true } label: { Label("Report a problem", systemImage: "exclamationmark.bubble") }
-                .foregroundStyle(Color.raceMuted)
+            Button { model.showReport = true } label: {
+                Label("Report a problem", systemImage: "exclamationmark.bubble")
+                    .frame(minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.raceMuted)
         }
         .sheet(isPresented: Binding(get: { model.showReport }, set: { model.showReport = $0 })) { ReportView() }
+        .confirmationDialog("Leave this race?", isPresented: $showLeaveConfirmation) {
+            Button("Leave race", role: .destructive, action: model.leaveLobby)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your current race session will end on this device.")
+        }
         .task {
             while !Task.isCancelled {
                 model.socket.presencePing()
@@ -287,8 +491,6 @@ struct GameView: View {
             }
         }
     }
-
-    private func canAnswer(_ question: QuestionEvent) -> Bool { question.state == .live }
 }
 
 struct ReportView: View {
@@ -318,10 +520,25 @@ struct AnswerButton: View {
     let disabled: Bool
     let action: () -> Void
     var body: some View {
-        Button(action: action) { Text(title).frame(maxWidth: .infinity).frame(minHeight: 54).font(.title3.bold()) }
+        Button(action: action) {
+            Text(title)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .font(.title3.bold())
+        }
+        .buttonStyle(AnswerButtonStyle(color: color, disabled: disabled))
+        .disabled(disabled)
+    }
+}
+
+struct AnswerButtonStyle: ButtonStyle {
+    let color: Color
+    let disabled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
             .foregroundStyle(.white)
-            .background(color.opacity(disabled ? 0.35 : 1), in: RoundedRectangle(cornerRadius: 12))
-            .disabled(disabled)
+            .opacity(disabled ? 0.42 : configuration.isPressed ? 0.78 : 1)
+            .background(color, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -346,26 +563,37 @@ struct CountdownView: View {
 struct RaceHUD: View {
     let snapshot: RaceSnapshotEvent?
     var body: some View {
-        HStack {
-            Label("Lap \(snapshot?.lapNumber ?? 0)/\(snapshot?.totalLaps ?? 0)", systemImage: "flag.checkered")
-            Spacer()
-            Text(snapshot?.trackStatus?.rawValue ?? "WAITING")
-                .font(.caption.bold())
-                .foregroundStyle(snapshot?.trackStatus == .green ? Color.raceGreen : Color.raceMuted)
-        }
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(Color.raceMuted)
-        .padding(12)
-        .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 10))
-        if let leader = snapshot?.leader, !leader.isEmpty {
-            HStack {
-                Label("P1", systemImage: "flag.fill").foregroundStyle(Color.raceRed)
-                Text(leader).fontWeight(.bold)
-                Spacer()
-                if let topThree = snapshot?.topThree { Text(topThree.joined(separator: " · ")).font(.caption).foregroundStyle(Color.raceMuted).lineLimit(1) }
+        RacePanel(padding: 14) {
+            VStack(spacing: 10) {
+                HStack {
+                    Label("Lap \(snapshot?.lapNumber ?? 0)/\(snapshot?.totalLaps ?? 0)", systemImage: "flag.checkered")
+                    Spacer()
+                    Text(snapshot?.trackStatus?.rawValue ?? "WAITING")
+                        .font(.caption.bold())
+                        .tracking(0.8)
+                        .foregroundStyle(snapshot?.trackStatus == .green ? Color.raceGreen : Color.raceMuted)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.raceMuted)
+
+                if let leader = snapshot?.leader, !leader.isEmpty {
+                    Divider().overlay(.white.opacity(0.08))
+                    HStack(spacing: 8) {
+                        Label("P1", systemImage: "flag.fill")
+                            .foregroundStyle(Color.raceRed)
+                        Text(leader)
+                            .fontWeight(.bold)
+                            .lineLimit(1)
+                        Spacer()
+                        if let topThree = snapshot?.topThree {
+                            Text(topThree.joined(separator: " · "))
+                                .font(.caption)
+                                .foregroundStyle(Color.raceMuted)
+                                .lineLimit(1)
+                        }
+                    }
+                }
             }
-            .padding(12)
-            .background(Color.racePanel, in: RoundedRectangle(cornerRadius: 10))
         }
     }
 }

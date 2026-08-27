@@ -19,6 +19,7 @@ enum Difficulty: String, Codable, Sendable { case easy = "EASY", medium = "MEDIU
 
 enum QuestionState: String, Codable, Sendable { case triggered = "TRIGGERED", live = "LIVE", locked = "LOCKED", active = "ACTIVE", resolved = "RESOLVED", explained = "EXPLAINED", closed = "CLOSED", cancelled = "CANCELLED", unknown
     init(from decoder: Decoder) throws { self = QuestionState(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .unknown }
+    var isAwaitingResolution: Bool { self == .locked || self == .active }
 }
 
 struct PlayerState: Codable, Sendable, Identifiable {
