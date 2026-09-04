@@ -1606,7 +1606,7 @@ io.on('connection', (socket) => {
    * Join or create a public solo lobby for the given session.
    * Handles matchmaking, username sanitization, atomic slot claim, and auto-start.
    */
-  socket.on('join_solo', async (data: { username: string; sessionKey: string; restoreUserId?: string }) => {
+  socket.on('join_solo', async (data: { username: string; sessionKey: string; restoreUserId?: string; replaySpeed?: number | null }) => {
     const joinStartTime = Date.now();
     try {
       if (!data.username?.trim() || !data.sessionKey) {
@@ -1617,6 +1617,7 @@ io.on('connection', (socket) => {
       console.log(`[join_solo] request session=${data.sessionKey} restore=${Boolean(data.restoreUserId)}`);
       const sanitizedUsername = await sanitizeUsernameForPublic(data.username.trim());
       const sessionKey = data.sessionKey;
+      const requestedReplaySpeed = normalizeReplaySpeed(data.replaySpeed ?? 1);
       const maxPlayers = getDefaultMaxPlayers();
       console.log(`[join_solo] sanitized username session=${sessionKey} changed=${sanitizedUsername !== data.username.trim()}`);
 
@@ -1695,7 +1696,7 @@ io.on('connection', (socket) => {
 
         if (shouldAutoStart) {
           try {
-            await startSessionForLobby(lobbyId, sessionKey, 1);
+            await startSessionForLobby(lobbyId, sessionKey, requestedReplaySpeed);
           } catch (startError) {
             console.error(`[join_solo] Failed to auto-start session ${sessionKey} for lobby ${lobbyId}:`, (startError as Error).message);
             await updateLobbyStatus(lobbyId, 'waiting').catch(() => undefined);
@@ -1723,7 +1724,7 @@ io.on('connection', (socket) => {
 
       if (!isNewLobby && shouldAutoStart) {
         try {
-          await maybeActivatePublicLobby(lobbyId, sessionKey, 1);
+          await maybeActivatePublicLobby(lobbyId, sessionKey, requestedReplaySpeed);
         } catch (startError) {
           console.error(`[join_solo] Failed to activate waiting lobby ${lobbyId}:`, (startError as Error).message);
         }
