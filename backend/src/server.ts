@@ -479,7 +479,10 @@ app.get('/health/config', (_req, res) => {
     },
     openf1: {
       baseUrl: process.env.OPENF1_BASE_URL || 'https://api.openf1.org/v1',
-      hasApiKey: Boolean(process.env.OPENF1_API_KEY?.trim()),
+      hasApiKey: Boolean(
+        process.env.OPENF1_API_KEY?.trim()
+        || (process.env.OPENF1_USERNAME?.trim() && process.env.OPENF1_PASSWORD)
+      ),
       requestTimeoutMs: parseOptionalPositiveNumber(process.env.OPENF1_REQUEST_TIMEOUT_MS) ?? 12_000,
     },
     liveTiming: {
